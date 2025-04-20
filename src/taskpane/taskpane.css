@@ -1,0 +1,38 @@
+/* 
+ * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
+ * See LICENSE in the project root for license information.
+ */
+
+ html,
+ body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+b {
+    font-weight: bold;
+}
+
+.main {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column;
+    flex-direction: column;
+    -webkit-flex-wrap: nowrap;
+    flex-wrap: nowrap;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-flex: 1 0 0;
+    flex: 1 0 0;
+    padding: 10px 20px;
+    height: 100%;
+}
+
+.main button,
+.main span,
+.main select,
+.main div {
+    width: 100%;
+    margin-top: 3px;
+}

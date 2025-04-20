@@ -1,0 +1,53 @@
+<!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
+<!-- This file shows how to design a first-run page that provides a welcome screen to the user about the features of the add-in. -->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Netsuite</title>
+
+    <!-- jQuery -->
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.9.1.min.js" type="text/javascript"></script>
+
+    <!-- Office JavaScript API -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+
+    <!-- For more information on Fluent UI, visit https://developer.microsoft.com/fluentui#/. -->
+    <link rel="stylesheet" href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"/>
+
+    <!-- Template styles -->
+    <link href="taskpane.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body class="ms-font-m ms-Fabric ms-bgColor-neutralLighter">
+    <section id="sideload-msg" class="main">
+        <h2 class="ms-font-xl">Please <a target="_blank" href="https://learn.microsoft.com/office/dev/add-ins/testing/test-debug-office-add-ins#sideload-an-office-add-in-for-testing">sideload</a> your add-in to see app body.</h2>
+    </section>
+    <main id="app-body" class="main" style="display: none;">
+        <span>Customer</span>
+        <select id="customerList" aria-label="Customer"></select>
+        <span>Project</span>
+        <select id="projectList" aria-label="Project"></select>
+        <span>Quote</span>
+        <select id="quoteList" aria-label="Quote"></select>
+        <span>Revision</span>
+        <select id="revisionList" aria-label="Revision"></select>
+        <span>BOM</span>
+        <select id="bomList" aria-label="BOM"></select>
+        <br>
+        <div id="bomData">
+            <button id="items">Items</button>
+            <button id="expenses">Expenses</button>
+            <button id="labor">Labor</button>
+        </div>
+        <br>
+        <button id="reload">Reload</button>
+        <button id="save">Save</button>
+    </main>
+</body>
+
+</html>
