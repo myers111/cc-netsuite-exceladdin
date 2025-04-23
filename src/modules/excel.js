@@ -1,14 +1,6 @@
 
 var objExcel = null;
 
-var LAST_ROW = 1048575;
-var LAST_COLUMN = 'XFD';
-var WS_ITEMS = 'Items';
-var WS_EXPENSES = 'Expenses';
-var WS_LABOR = 'Labor';
-var WS_RANGE = 'A:' + LAST_COLUMN;
-var WS_RANGE_MINUS_ROW1 = 'A2:' + LAST_COLUMN + LAST_ROW;
-
 module.exports = {
 
     initialize: async function (options) {
@@ -118,14 +110,16 @@ module.exports = {
             await context.sync();
         });
     },
-    clearData: async function (sheetName) {
+    clearData: async function () {
     
         await objExcel.run(async (context) => {
 
-            var sheet = context.workbook.worksheets.getItem(sheetName);
-        
-            sheet.getRange(WS_RANGE_MINUS_ROW1).clear();
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
 
+            sheet.getRange().clear();
+
+            sheet.getRange().format.useStandardWidth = true;
+            
             await context.sync();
         });
     },

@@ -27,7 +27,7 @@
     <section id="sideload-msg" class="main">
         <h2 class="ms-font-xl">Please <a target="_blank" href="https://learn.microsoft.com/office/dev/add-ins/testing/test-debug-office-add-ins#sideload-an-office-add-in-for-testing">sideload</a> your add-in to see app body.</h2>
     </section>
-    <main id="app-body" class="main" style="display: none;">
+    <main id="app-body" style="display: none;">
         <span>Customer</span>
         <select id="customerList" aria-label="Customer"></select>
         <span>Project</span>
@@ -36,17 +36,27 @@
         <select id="quoteList" aria-label="Quote"></select>
         <span>Revision</span>
         <select id="revisionList" aria-label="Revision"></select>
+        <div id="revData" style="display: none;">
+            <table>
+                <tr>
+                    <td>Amount</td>
+                    <td><input id="revAmount" type="text" disabled/></td>
+                </tr>
+                <tr>
+                    <td>Default MU</td>
+                    <td><input id="revDefaultMU" type="text"/></td>
+                </tr>
+            </table>
+        </div>
         <span>BOM</span>
         <select id="bomList" aria-label="BOM"></select>
-        <br>
-        <div id="bomData">
+        <div id="bomData" style="display: none;">
             <button id="items">Items</button>
             <button id="expenses">Expenses</button>
             <button id="labor">Labor</button>
+            <button id="reload">Reload</button>
+            <button id="save">Save</button>
         </div>
-        <br>
-        <button id="reload">Reload</button>
-        <button id="save">Save</button>
     </main>
 </body>
 

@@ -14,7 +14,12 @@ b {
     font-weight: bold;
 }
 
-.main {
+select,
+button {
+    padding: 3px;
+}
+
+main {
     display: -webkit-flex;
     display: flex;
     -webkit-flex-direction: column;
@@ -29,10 +34,33 @@ b {
     height: 100%;
 }
 
-.main button,
-.main span,
-.main select,
-.main div {
+main button,
+main span,
+main select,
+main div {
     width: 100%;
     margin-top: 3px;
+}
+
+main table {
+    border-collapse: collapse;
+}
+
+main table td {
+    padding: 3px;
+    text-wrap: nowrap;
+}
+
+main table td input {
+    width: 75px;
+    text-align: center;
+}
+
+#reload {
+    margin-top: 15px;
+}
+
+button.highLight {
+    background-color: #2C73D9;
+    color: #ffffff;
 }
