@@ -3,22 +3,12 @@
  * See LICENSE in the project root for license information.
  */
 
+const { getgid } = require('process');
 const api = require('../modules/api.js');
 const excel = require('../modules/excel.js');
 
-const NEWITEM = 3757;
-const ITEM_HEADERS = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
-const EXPENSE_HEADERS = [['Account *','Quantity *','Price *','Amount','MU%','Discount','Quote']];
-const LABOR_HEADERS = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
-
-const BOM = {
-    items: 0,
-    expenses: 1,
-    labor: 2
-};
-
-var BOM_ID = 0;
-var BOM_SECTION = 0;
+const NEW_ITEM = 3757;
+const HIGHLIGHT_CLASS = "highLight";
 
 /* global console, document, Excel, Office */
 
@@ -28,15 +18,13 @@ Office.onReady((info) => {
 
         window.onload = onRefresh;
 
-        document.getElementById("sideload-msg").style.display = "none";
-        document.getElementById("app-body").style.display = "flex";
-
-        document.getElementById("items").onclick = onItems;
-        document.getElementById("expenses").onclick = onExpenses;
-        document.getElementById("labor").onclick = onLabor;
-
-        document.getElementById("reload").onclick = reload;
-        document.getElementById("save").onclick = save;
+        document.getElementById("summary").onclick = onRevisionSummary;
+        document.getElementById("overview").onclick = onRevisionOverview;
+        document.getElementById("items").onclick = onBomItems;
+        document.getElementById("expenses").onclick = onBomExpenses;
+        document.getElementById("labor").onclick = onBomLabor;
+        //document.getElementById("reload").onclick = onReload;
+        //document.getElementById("save").onclick = onSave;
 
         initList('customer');
         initList('project');
@@ -83,23 +71,14 @@ async function initList(id) {
             case 'quotes':
                 emptyList("#revisionList");
                 emptyList("#bomList");
-                onQuoteChange({
-                    id: ($('#quoteList').val() ? $('#quoteList').val() : 0)
-                });
+                onQuoteChange();
                 break;
             case 'revisions':
                 emptyList("#bomList");
-                onRevisionChange({
-                    id: ($('#revisionList').val() ? $('#revisionList').val() : 0),
-                    quoteId: ($('#quoteList').val() ? $('#quoteList').val() : 0)
-                });
+                onRevisionChange();
                 break;
             case 'boms':
-                onBomChange({
-                    id: ($('#bomList').val() ? $('#bomList').val() : 0),
-                    revId: ($('#revisionList').val() ? $('#revisionList').val() : 0),
-                    //defaultMU: $('#defaultMU').val().replace('%','')
-                });
+                onBomChange();
                 break;
         } 
     });
@@ -126,14 +105,12 @@ async function loadList(selector, path) {
         sel.append('<option value="' + data[i].id + '">' + data[i].name + '</option>');
     }
 
+    if (path != 'revisions')  sel.prepend('<option value=""></option>');
+
     switch (path) {
         case 'revisions':
         case 'boms':
             sel.prop("selectedIndex", 0).trigger('change');
-            break;
-        default:
-            sel.prepend('<option value=""></option>');
-            break;
     }
 }
 
@@ -150,8 +127,8 @@ function getOptions(path) {
 
     switch (path) {
         case 'boms':
-            var revId = $('#revisionList').val();
-            if (parseInt(revId)) options['revId'] = revId;
+            var revisionId = $('#revisionList').val();
+            if (parseInt(revisionId)) options['revisionId'] = revisionId;
         case 'revisions':
             var quoteId = $('#quoteList').val();
             if (parseInt(quoteId)) options['quoteId'] = quoteId;
@@ -166,64 +143,123 @@ function getOptions(path) {
     return (Object.keys(options).length == 0 ? null : options);
 }
 
-async function onQuoteChange(options) {
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if (options.id) await loadList('#revisionList', 'revisions');
+async function onQuoteChange() {
 
-    document.getElementById("revData").style.display = (options.id > 0 ? '' : 'none');
-}
+    var quoteId = $('#quoteList').val();
 
-async function onRevisionChange(options) {
-
-    if (options.id) {
-    
-        var params = {path: 'revision', 'options': options};
-
-        var data = await api.get(params);
-    
-        document.getElementById("revAmount").value = data.amount.toLocaleString();
-        document.getElementById("revDefaultMU").value = (data.defaultMU * 100).toFixed(2);
-
-        await loadList('#bomList', 'boms');
+    if (quoteId) {
+        
+        await loadList('#revisionList', 'revisions');
     }
+
+    document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
+    document.getElementById("revisionButtons").style.display = (quoteId > 0 ? '' : 'none');
+
+    document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
 }
 
-async function onBomChange(options) {
+async function onRevisionChange() {
 
-    document.getElementById("bomData").style.display = (options.id > 0 ? '' : 'none');
+    onRevisionSummary();
 
-    BOM_ID = options.id;
-
-    if (BOM_ID > 0)
-        onItems();
-    else
-        onSummary();
+    await loadList('#bomList', 'boms');
 }
 
-async function onSummary() {
+async function getRevisionData(buttonId) {
 
-}
+    //$('#bomList').val(0).trigger('change');
 
-async function onItems() {
-
-    BOM_SECTION = BOM.items;
-
-    document.getElementById("items").className = "highLight";
-    document.getElementById("expenses").className = "";
-    document.getElementById("labor").className = "";
+    setButton(buttonId);
 
     var params = {
-        path: 'bom-items',
-        options: {id: BOM_ID}
+        path: 'revision-' + buttonId,
+        options: {
+            id: $('#revisionList').val(),
+            quoteId: $('#quoteList').val()
+        }
     };
 
-    var data = await api.get(params);
+    return await api.get(params);
+}
 
-    if (!data) return;
+async function onRevisionSummary() {
 
-    var dataArray = ITEM_HEADERS;
+    var data = await getRevisionData("summary");
 
-    if (data.items.length) dataArray = dataArray.concat(getItemArray(data.items));
+    var dataArray = getSummaryArray(data);
+
+    excel.addData({
+        data: dataArray,
+        //sumColumns: ['F','K'],
+        formulas: [
+            {
+                column: 'D',
+                formula: '=A?*C?'
+            },
+            {
+                column: 'F',
+                formula: '=A?*E?'
+            }
+        ],
+        formats: [
+            {
+                columns: ['C','D','E','F'],
+                format: '0.00'
+            },
+            {
+                columns: ['A'],
+                format: '0'
+            }
+        ]
+    });
+}
+
+async function onRevisionOverview() {
+
+    var data = await api.get({
+        path: 'revision-overview',
+        options: {
+            id: $('#revisionList').val(),
+            quoteId: $('#quoteList').val()
+        }
+    });
+}
+
+async function onBomChange() {
+
+    var bomOptionCount = $('#bomList option').length;
+
+    document.getElementById("bomControls").style.display = (bomOptionCount > 1 ? '' : 'none');
+
+    var bomId = $('#bomList').val();
+
+    document.getElementById("bomButtons").style.display = (bomId > 0 ? '' : 'none');
+
+    if (bomId > 0)
+        onBomItems();
+    else
+        onRevisionSummary();
+}
+
+async function getBomData(buttonId) {
+
+    setButton(buttonId);
+
+    var params = {
+        path: 'bom-' + buttonId,
+        options: {id: $('#bomList').val()}
+    };
+
+    return await api.get(params);
+}
+
+async function onBomItems() {
+
+    var data = await getBomData("items");
+
+    var dataArray = getItemArray(data.items);
 
     excel.addData({
         data: dataArray,
@@ -251,26 +287,11 @@ async function onItems() {
     });
 }
 
-async function onExpenses() {
+async function onBomExpenses() {
 
-    BOM_SECTION = BOM.expenses;
+    var data = await getBomData("expenses");
 
-    document.getElementById("items").className = "";
-    document.getElementById("expenses").className = "highLight";
-    document.getElementById("labor").className = "";
-
-    var params = {
-        path: 'bom-expenses',
-        options: {id: BOM_ID}
-    };
-
-    var data = await api.get(params);
-
-    if (!data) return;
-
-    var dataArray = EXPENSE_HEADERS;
-
-    if (data.expenses.length) dataArray = dataArray.concat(getExpenseArray(data.expenses));
+    var dataArray = getExpenseArray(data.expenses);
 
     excel.addData({
         data: dataArray,
@@ -298,26 +319,11 @@ async function onExpenses() {
     });
 }
 
-async function onLabor() {
+async function onBomLabor() {
 
-    BOM_SECTION = BOM.labor;
+    var data = await getBomData("labor");
 
-    document.getElementById("items").className = "";
-    document.getElementById("expenses").className = "";
-    document.getElementById("labor").className = "highLight";
-
-    var params = {
-        path: 'bom-labor',
-        options: {id: BOM_ID}
-    };
-
-    var data = await api.get(params);
-
-    if (!data) return;
-
-    var dataArray = LABOR_HEADERS;
-
-    if (data.labor.length) dataArray = dataArray.concat(getItemArray(data.labor));
+    var dataArray = getLaborArray(data.labor);
 
     excel.addData({
         data: dataArray,
@@ -344,6 +350,166 @@ async function onLabor() {
         ]
     });
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function getSummaryArray(items) {
+
+    var dataArray = [['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote']];
+
+    for (var i = 0; i < items.length; i++) {
+    
+        var item = items[i];
+
+        dataArray.push([
+            item.quantity,
+            item.desc,
+            item.cost,
+            item.quantity * item.cost,
+            item.quote,
+            item.quantity * item.quote
+        ]);   
+    }
+
+    return dataArray;
+}
+
+function getOverviewArray(items) {
+
+    var dataArray = [['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote']];
+
+    for (var i = 0; i < items.length; i++) {
+    
+        var item = items[i];
+
+        dataArray.push([
+            item.quantity,
+            item.desc,
+            item.cost,
+            item.quantity * item.cost,
+            item.quote,
+            item.quantity * item.quote
+        ]);   
+    }
+
+    return dataArray;
+}
+
+function getItemArray(items) {
+
+    var dataArray = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
+
+    for (var i = 0; i < items.length; i++) {
+    
+        var item = items[i];
+
+        var quantity = (item.quantity ? parseInt(item.quantity) : 0);
+        var price = (item.price ? parseFloat(item.price) : 0);
+        var markup = (item.markup ? parseFloat(item.markup) : 0);
+        var defaultMU = (item.defaultMU ? parseFloat(item.defaultMU) : 0);
+
+        dataArray.push([
+            (item.itemId == NEW_ITEM ? item.newItem : item.name),
+            (item.itemId == NEW_ITEM ? item.newDescription : item.description),
+            quantity,
+            item.units,
+            price,
+            (quantity * price),
+            (item.vendorId ? item.vendor : item.newVendor),
+            item.manufacturer,
+            item.mpn,
+            (markup > 0 ? markup : ''),
+            (item.discount == 'T' ? 'Yes' : 'No'),
+            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
+        ]);   
+    }
+
+    return dataArray;
+}
+
+function getExpenseArray(expenses) {
+
+    var dataArray = [['Account *','Quantity *','Price *','Amount','MU%','Discount','Quote']];
+
+    for (var i = 0; i < expenses.length; i++) {
+    
+        var expense = expenses[i];
+
+        var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
+        var price = (expense.price ? parseFloat(expense.price) : 0);
+        var markup = (expense.markup ? parseFloat(expense.markup) : 0);
+        var defaultMU = (expense.defaultMU ? parseFloat(expense.defaultMU) : 0);
+
+        dataArray.push([
+            expense.name,
+            quantity,
+            price,
+            (quantity * price),
+            (markup > 0 ? markup : ''),
+            (expense.discount == 'T' ? 'Yes' : 'No'),
+            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
+        ]);   
+    }
+
+    return dataArray;
+}
+
+function getLaborArray(items) {
+
+    var dataArray = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
+
+    for (var i = 0; i < items.length; i++) {
+    
+        var item = items[i];
+
+        var quantity = (item.quantity ? parseInt(item.quantity) : 0);
+        var price = (item.price ? parseFloat(item.price) : 0);
+        var markup = (item.markup ? parseFloat(item.markup) : 0);
+        var defaultMU = (item.defaultMU ? parseFloat(item.defaultMU) : 0);
+
+        dataArray.push([
+            (item.itemId == NEW_ITEM ? item.newItem : item.name),
+            (item.itemId == NEW_ITEM ? item.newDescription : item.description),
+            quantity,
+            item.units,
+            price,
+            (quantity * price),
+            (item.vendorId ? item.vendor : item.newVendor),
+            item.manufacturer,
+            item.mpn,
+            (markup > 0 ? markup : ''),
+            (item.discount == 'T' ? 'Yes' : 'No'),
+            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
+        ]);   
+    }
+
+    return dataArray;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function setButton(id) {
+
+    resetButtons();
+
+    document.getElementById(id).className = HIGHLIGHT_CLASS;
+}
+
+function resetButtons() {
+
+    document.getElementById("summary").className = "";
+    document.getElementById("overview").className = "";
+    document.getElementById("items").className = "";
+    document.getElementById("expenses").className = "";
+    document.getElementById("labor").className = "";
+}
+
+function getButton() {
+
+    return $("#bomControls" + HIGHLIGHT_CLASS).attr("id");
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async function saveItems() {
 
@@ -398,95 +564,4 @@ async function saveItems() {
 
         console.error(error);
     }
-}
-
-function getItemArray(items) {
-
-    var itemArray = [];
-
-    for (var i = 0; i < items.length; i++) {
-    
-        var item = items[i];
-
-        var quantity = (item.quantity ? parseInt(item.quantity) : 0);
-        var price = (item.price ? parseFloat(item.price) : 0);
-        var markup = (item.markup ? parseFloat(item.markup) : 0);
-        var defaultMU = (item.defaultMU ? parseFloat(item.defaultMU) : 0);
-
-        itemArray.push([
-            (item.itemId == NEWITEM ? item.newItem : item.name),
-            (item.itemId == NEWITEM ? item.newDescription : item.description),
-            quantity,
-            item.units,
-            price,
-            (quantity * price),
-            (item.vendorId ? item.vendor : item.newVendor),
-            item.manufacturer,
-            item.mpn,
-            (markup > 0 ? markup : ''),
-            (item.discount == 'T' ? 'Yes' : 'No'),
-            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
-        ]);   
-    }
-
-    return itemArray;
-}
-
-function getExpenseArray(expenses) {
-
-    var expenseArray = [];
-
-    for (var i = 0; i < expenses.length; i++) {
-    
-        var expense = expenses[i];
-
-        var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
-        var price = (expense.price ? parseFloat(expense.price) : 0);
-        var markup = (expense.markup ? parseFloat(expense.markup) : 0);
-        var defaultMU = (expense.defaultMU ? parseFloat(expense.defaultMU) : 0);
-
-        expenseArray.push([
-            expense.name,
-            quantity,
-            price,
-            (quantity * price),
-            (markup > 0 ? markup : ''),
-            (expense.discount == 'T' ? 'Yes' : 'No'),
-            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
-        ]);   
-    }
-
-    return expenseArray;
-}
-
-function getLaborArray(items) {
-
-    var itemArray = [];
-
-    for (var i = 0; i < items.length; i++) {
-    
-        var item = items[i];
-
-        var quantity = (item.quantity ? parseInt(item.quantity) : 0);
-        var price = (item.price ? parseFloat(item.price) : 0);
-        var markup = (item.markup ? parseFloat(item.markup) : 0);
-        var defaultMU = (item.defaultMU ? parseFloat(item.defaultMU) : 0);
-
-        itemArray.push([
-            (item.itemId == NEWITEM ? item.newItem : item.name),
-            (item.itemId == NEWITEM ? item.newDescription : item.description),
-            quantity,
-            item.units,
-            price,
-            (quantity * price),
-            (item.vendorId ? item.vendor : item.newVendor),
-            item.manufacturer,
-            item.mpn,
-            (markup > 0 ? markup : ''),
-            (item.discount == 'T' ? 'Yes' : 'No'),
-            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
-        ]);   
-    }
-
-    return itemArray;
 }

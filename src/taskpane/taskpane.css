@@ -3,20 +3,16 @@
  * See LICENSE in the project root for license information.
  */
 
- html,
- body {
+html,
+body {
     width: 100%;
+    height: 100%;
     margin: 0;
     padding: 0;
 }
 
 b {
     font-weight: bold;
-}
-
-select,
-button {
-    padding: 3px;
 }
 
 main {
@@ -26,41 +22,28 @@ main {
     flex-direction: column;
     -webkit-flex-wrap: nowrap;
     flex-wrap: nowrap;
-    -webkit-align-items: center;
-    align-items: center;
     -webkit-flex: 1 0 0;
     flex: 1 0 0;
+    -webkit-align-items: center;
+    align-items: center;
     padding: 10px 20px;
-    height: 100%;
+    height: 96%;
 }
 
 main button,
 main span,
 main select,
 main div {
+    padding: 3px;
     width: 100%;
     margin-top: 3px;
-}
-
-main table {
-    border-collapse: collapse;
-}
-
-main table td {
-    padding: 3px;
-    text-wrap: nowrap;
-}
-
-main table td input {
-    width: 75px;
-    text-align: center;
-}
-
-#reload {
-    margin-top: 15px;
 }
 
 button.highLight {
     background-color: #2C73D9;
     color: #ffffff;
+}
+
+#controls {
+    margin-top: auto;
 }

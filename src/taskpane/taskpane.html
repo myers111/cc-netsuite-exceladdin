@@ -24,36 +24,31 @@
 </head>
 
 <body class="ms-font-m ms-Fabric ms-bgColor-neutralLighter">
-    <section id="sideload-msg" class="main">
-        <h2 class="ms-font-xl">Please <a target="_blank" href="https://learn.microsoft.com/office/dev/add-ins/testing/test-debug-office-add-ins#sideload-an-office-add-in-for-testing">sideload</a> your add-in to see app body.</h2>
-    </section>
-    <main id="app-body" style="display: none;">
+    <main>
         <span>Customer</span>
         <select id="customerList" aria-label="Customer"></select>
         <span>Project</span>
         <select id="projectList" aria-label="Project"></select>
         <span>Quote</span>
         <select id="quoteList" aria-label="Quote"></select>
-        <span>Revision</span>
-        <select id="revisionList" aria-label="Revision"></select>
-        <div id="revData" style="display: none;">
-            <table>
-                <tr>
-                    <td>Amount</td>
-                    <td><input id="revAmount" type="text" disabled/></td>
-                </tr>
-                <tr>
-                    <td>Default MU</td>
-                    <td><input id="revDefaultMU" type="text"/></td>
-                </tr>
-            </table>
+        <div id="revisionControls" style="display: none;">
+            <span>Revision</span>
+            <select id="revisionList" aria-label="Revision"></select>
         </div>
-        <span>BOM</span>
-        <select id="bomList" aria-label="BOM"></select>
-        <div id="bomData" style="display: none;">
+        <div id="revisionButtons" style="display: none;">
+            <button id="summary">Summary</button>
+            <button id="overview">Overview</button>
+        </div>
+        <div id="bomControls" style="display: none;">
+            <span>BOM</span>
+            <select id="bomList" aria-label="BOM"></select>
+        </div>
+        <div id="bomButtons" style="display: none;">
             <button id="items">Items</button>
             <button id="expenses">Expenses</button>
             <button id="labor">Labor</button>
+        </div>
+        <div id="controls" style="display: none;">
             <button id="reload">Reload</button>
             <button id="save">Save</button>
         </div>
