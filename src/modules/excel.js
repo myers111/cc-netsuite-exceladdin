@@ -30,73 +30,76 @@ module.exports = {
 
             sheet.getRange(rangeString).values = options.data;
 
-            if (options.formulas) {
+            if (options.data.length > 1) {
 
-                for (var i = 0; i < options.formulas.length; i++) {
-            
-                    var formula = options.formulas[i];
+                if (options.formulas) {
 
-                    var formulas = [];
-
-                    for (var j = 0; j < options.data.length - 1; j++) {
+                    for (var i = 0; i < options.formulas.length; i++) {
+                
+                        var formula = options.formulas[i];
     
-                        formulas.push([formula.formula.replaceAll('?', (j + 2))]);
-                    }
-
-                    var rangeString = getRangeString({
-                        firstColumn: formula.column,
-                        firstRow: 2,
-                        columns: 1,
-                        rows: options.data.length - 1
-                    });
-
-                    sheet.getRange(rangeString).formulas = formulas;
-                }
-            }
-
-            if (options.sumColumns) {
-
-                for (var i = 0; i < options.sumColumns.length; i++) {
-
-                    var column = options.sumColumns[i];
-
-                    var rangeString = getRangeString({
-                        firstColumn: column,
-                        firstRow: options.data.length + 1,
-                        columns: 1,
-                        rows: 1
-                    });
-
-                    var range = sheet.getRange(rangeString);
-                    
-                    range.formulas = [['=SUM(' + column + '2:' + column + (options.data.length) + ')']];
-                    range.format.font.bold = true;
-                }
-            }
-
-            if (options.formats) {
-
-                for (var i = 0; i < options.formats.length; i++) {
-
-                    var format = options.formats[i];
-
-                    var formats = [];
-
-                    for (var j = 0; j < options.data.length - 1; j++) {
+                        var formulas = [];
     
-                        formats.push([format.format]);
-                    }
-
-                    for (var j = 0; j < format.columns.length; j++) {
+                        for (var j = 0; j < options.data.length - 1; j++) {
+        
+                            formulas.push([formula.formula.replaceAll('?', (j + 2))]);
+                        }
     
                         var rangeString = getRangeString({
-                            firstColumn: format.columns[j],
+                            firstColumn: formula.column,
                             firstRow: 2,
                             columns: 1,
                             rows: options.data.length - 1
                         });
-
-                        sheet.getRange(rangeString).numberFormat = formats;
+    
+                        sheet.getRange(rangeString).formulas = formulas;
+                    }
+                }
+    
+                if (options.sumColumns) {
+    
+                    for (var i = 0; i < options.sumColumns.length; i++) {
+    
+                        var column = options.sumColumns[i];
+    
+                        var rangeString = getRangeString({
+                            firstColumn: column,
+                            firstRow: options.data.length + 1,
+                            columns: 1,
+                            rows: 1
+                        });
+    
+                        var range = sheet.getRange(rangeString);
+                        
+                        range.formulas = [['=SUM(' + column + '2:' + column + (options.data.length) + ')']];
+                        range.format.font.bold = true;
+                    }
+                }
+    
+                if (options.formats) {
+    
+                    for (var i = 0; i < options.formats.length; i++) {
+    
+                        var format = options.formats[i];
+    
+                        var formats = [];
+    
+                        for (var j = 0; j < options.data.length - 1; j++) {
+        
+                            formats.push([format.format]);
+                        }
+    
+                        for (var j = 0; j < format.columns.length; j++) {
+        
+                            var rangeString = getRangeString({
+                                firstColumn: format.columns[j],
+                                firstRow: 2,
+                                columns: 1,
+                                rows: options.data.length - 1
+                            });
+    
+                            sheet.getRange(rangeString).numberFormat = formats;
+                        }
                     }
                 }
             }

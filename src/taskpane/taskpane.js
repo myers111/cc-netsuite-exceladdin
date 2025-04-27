@@ -169,8 +169,6 @@ async function onRevisionChange() {
 
 async function getRevisionData(buttonId) {
 
-    //$('#bomList').val(0).trigger('change');
-
     setButton(buttonId);
 
     var params = {
@@ -186,12 +184,12 @@ async function getRevisionData(buttonId) {
 
 async function onRevisionSummary() {
 
+    $('#bomList').val(0);
+
     var data = await getRevisionData("summary");
 
-    var dataArray = getSummaryArray(data);
-
     excel.addData({
-        data: dataArray,
+        data: getSummaryArray(data),
         //sumColumns: ['F','K'],
         formulas: [
             {
@@ -259,10 +257,8 @@ async function onBomItems() {
 
     var data = await getBomData("items");
 
-    var dataArray = getItemArray(data.items);
-
     excel.addData({
-        data: dataArray,
+        data: getItemArray(data.items),
         //sumColumns: ['F','K'],
         formulas: [
             {
@@ -291,10 +287,8 @@ async function onBomExpenses() {
 
     var data = await getBomData("expenses");
 
-    var dataArray = getExpenseArray(data.expenses);
-
     excel.addData({
-        data: dataArray,
+        data: getExpenseArray(data.expenses),
         //sumColumns: ['F','K'],
         formulas: [
             {
@@ -323,10 +317,8 @@ async function onBomLabor() {
 
     var data = await getBomData("labor");
 
-    var dataArray = getLaborArray(data.labor);
-
     excel.addData({
-        data: dataArray,
+        data: getLaborArray(data.labor),
         //sumColumns: ['F','K'],
         formulas: [
             {
@@ -489,6 +481,8 @@ function getLaborArray(items) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function setButton(id) {
+
+    if (id == "summary" || id == "overview") document.getElementById("bomButtons").style.display = 'none';
 
     resetButtons();
 
