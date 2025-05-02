@@ -23,83 +23,41 @@ module.exports = {
             sheet.getRange().clear();
 
             var rangeString = getRangeString({
-                firstRow: 1,
-                columns: options.data[0].length,
-                rows: options.data.length
+                rows: options.data.length,
+                columns: options.data[0].length
             });
 
             sheet.getRange(rangeString).values = options.data;
 
-            if (options.data.length > 1) {
+            if (options.ranges) {
 
-                if (options.formulas) {
+                for (var i = 0; i < options.ranges.length; i++) {
 
-                    for (var i = 0; i < options.formulas.length; i++) {
-                
-                        var formula = options.formulas[i];
-    
-                        var formulas = [];
-    
-                        for (var j = 0; j < options.data.length - 1; j++) {
-        
-                            formulas.push([formula.formula.replaceAll('?', (j + 2))]);
-                        }
-    
-                        var rangeString = getRangeString({
-                            firstColumn: formula.column,
-                            firstRow: 2,
-                            columns: 1,
-                            rows: options.data.length - 1
-                        });
-    
-                        sheet.getRange(rangeString).formulas = formulas;
+                    var range = options.ranges[i];
+
+                    if (!range.rows) range.rows = options.data.length - (range.firstRow ? range.firstRow - 1 : 0);
+
+                    if (range.cell) {
+
+                        setRange(sheet, range);
                     }
-                }
-    
-                if (options.sumColumns) {
-    
-                    for (var i = 0; i < options.sumColumns.length; i++) {
-    
-                        var column = options.sumColumns[i];
-    
-                        var rangeString = getRangeString({
-                            firstColumn: column,
-                            firstRow: options.data.length + 1,
-                            columns: 1,
-                            rows: 1
-                        });
-    
-                        var range = sheet.getRange(rangeString);
-                        
-                        range.formulas = [['=SUM(' + column + '2:' + column + (options.data.length) + ')']];
-                        range.format.font.bold = true;
+                    else if (range.columns) {
+
+                        for (var j = 0; j < range.columns.length; j++) {
+
+                            var rng = range;
+
+                            rng.firstColumn = range.columns[j];
+                            rng.columns = 1;
+
+                            setRange(sheet, rng);
+                        }
                     }
-                }
-    
-                if (options.formats) {
-    
-                    for (var i = 0; i < options.formats.length; i++) {
-    
-                        var format = options.formats[i];
-    
-                        var formats = [];
-    
-                        for (var j = 0; j < options.data.length - 1; j++) {
-        
-                            formats.push([format.format]);
-                        }
-    
-                        for (var j = 0; j < format.columns.length; j++) {
-        
-                            var rangeString = getRangeString({
-                                firstColumn: format.columns[j],
-                                firstRow: 2,
-                                columns: 1,
-                                rows: options.data.length - 1
-                            });
-    
-                            sheet.getRange(rangeString).numberFormat = formats;
-                        }
+                    else {
+
+                        if (!range.columns) range.columns = options.data[0].length;
+
+                        setRange(sheet, range);
                     }
                 }
             }
@@ -107,8 +65,6 @@ module.exports = {
             var rangeString = getRangeString({
                 columns: options.data[0].length
             });
-
-            sheet.getRange(rangeString).format.autofitColumns();
 
             await context.sync();
         });
@@ -134,4 +90,42 @@ function getRangeString(options) {
     var firstRow = (options.firstRow ? options.firstRow : 1);
 
     return (firstColumn + (options.rows ? firstRow : '') + ':' + String.fromCharCode(firstColumn.charCodeAt(0) + options.columns - 1) + (options.rows ? firstRow + options.rows - 1 : ''));
+}
+
+function setRange(sheet, options) {
+
+    var range = null;
+    
+    if (options.cell)
+        range = sheet.getRange(options.cell);
+    else
+        range = sheet.getRange(getRangeString(options));
+
+    if (options.formula) {
+
+        var formulas = [];
+    
+        for (var i = 0; i < options.rows; i++) {
+    
+            formulas.push(['=' + options.formula.replaceAll('?', (i + options.firstRow))]);
+        }
+
+        range.formulas = formulas;
+    }
+
+    if (options.numberFormat) {
+
+        var numberFormats = [];
+    
+        for (var i = 0; i < options.rows; i++) {
+    
+            numberFormats.push([options.numberFormat]);
+        }
+
+        range.numberFormat = numberFormats;
+    }
+
+    if (options.color)  range.format.fill.color = options.color;
+
+    if (options.bold) range.format.font.bold = true;
 }

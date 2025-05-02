@@ -190,25 +190,29 @@ async function onRevisionSummary() {
 
     excel.addData({
         data: getSummaryArray(data),
-        //sumColumns: ['F','K'],
-        formulas: [
+        ranges: [
             {
-                column: 'D',
-                formula: '=A?*C?'
+                firstRow: 2,
+                columns: ['D'],
+                formula: 'A?*C?'
             },
             {
-                column: 'F',
-                formula: '=A?*E?'
-            }
-        ],
-        formats: [
+                firstRow: 2,
+                columns: ['F'],
+                formula: 'A?*E?'
+            },
             {
+                firstRow: 2,
                 columns: ['C','D','E','F'],
-                format: '0.00'
+                numberFormat: '0.00'
             },
             {
+                firstRow: 2,
                 columns: ['A'],
-                format: '0'
+                numberFormat: '0'
+            },
+            {
+                color: 'lightgrey'
             }
         ]
     });
@@ -259,25 +263,26 @@ async function onBomItems() {
 
     excel.addData({
         data: getItemArray(data.items),
-        //sumColumns: ['F','K'],
-        formulas: [
+        ranges: [
             {
-                column: 'F',
+                firstRow: 2,
+                columns: ['F'],
                 formula: '=C?*E?'
             },
             {
-                column: 'L',
+                firstRow: 2,
+                columns: ['L'],
                 formula: '=ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
-            }
-        ],
-        formats: [
-            {
-                columns: ['E','F','J'],
-                format: '0.00'
             },
             {
+                firstRow: 2,
+                columns: ['E','F','J'],
+                numberFormat: '0.00'
+            },
+            {
+                firstRow: 2,
                 columns: ['C'],
-                format: '0'
+                numberFormat: '0'
             }
         ]
     });
@@ -289,25 +294,26 @@ async function onBomExpenses() {
 
     excel.addData({
         data: getExpenseArray(data.expenses),
-        //sumColumns: ['F','K'],
-        formulas: [
+        ranges: [
             {
-                column: 'D',
-                formula: '=C?*E?'
+                firstRow: 2,
+                columns: ['D'],
+                formula: '=C?*E? '
             },
             {
-                column: 'G',
-                formula: '=ROUND(D?*(1+IF(F?="Yes",-1,1)*IF(ISNUMBER(E?),E?,' + data.defaultMU + ')/100),0)'
-            }
-        ],
-        formats: [
+                firstRow: 2,
+                columns: ['G'],
+                formula: '=ROUND(B?*(1+IF(F?="Yes",-1,1)*IF(ISNUMBER(E?),E?,' + data.defaultMU + ')/100),0)'
+            },
             {
+                firstRow: 2,
                 columns: ['C','D','G'],
-                format: '0.00'
+                numberFormat: '0.00'
             },
             {
+                firstRow: 2,
                 columns: ['B'],
-                format: '0'
+                numberFormat: '0'
             }
         ]
     });
@@ -319,28 +325,7 @@ async function onBomLabor() {
 
     excel.addData({
         data: getLaborArray(data.labor),
-        //sumColumns: ['F','K'],
-        formulas: [
-            {
-                column: 'F',
-                formula: '=C?*E?'
-            },
-            {
-                column: 'L',
-                formula: '=ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
-            }
-        ],
-        formats: [
-            {
-                columns: ['E','F','J'],
-                format: '0.00'
-            },
-            {
-                columns: ['C'],
-                format: '0'
-            }
-        ]
-    });
+     });
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
