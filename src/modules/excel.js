@@ -37,6 +37,8 @@ module.exports = {
 
                     if (!range.rows) range.rows = options.data.length - (range.firstRow ? range.firstRow - 1 : 0);
 
+                    if (range.rows == 0) continue;
+                    
                     if (range.cell) {
 
                         setRange(sheet, range);
@@ -65,6 +67,8 @@ module.exports = {
             var rangeString = getRangeString({
                 columns: options.data[0].length
             });
+
+            sheet.getRange(rangeString).format.autofitColumns();
 
             await context.sync();
         });
@@ -125,7 +129,13 @@ function setRange(sheet, options) {
         range.numberFormat = numberFormats;
     }
 
-    if (options.color) range.format.fill.color = options.color;
+    if (options.color) {
+        
+        if (options.color == 'white')
+            range.format.fill.clear();
+        else
+            range.format.fill.color = options.color;
+    }
 
     if (options.bold) range.format.font.bold = true;
 }

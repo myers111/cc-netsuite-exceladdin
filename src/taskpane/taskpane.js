@@ -311,12 +311,12 @@ async function onBomExpenses() {
             {
                 firstRow: 2,
                 columns: ['D'],
-                formula: 'C?*E? '
+                formula: 'C?*E?'
             },
             {
                 firstRow: 2,
                 columns: ['G'],
-                formula: 'ROUND(B?*(1+IF(F?="Yes",-1,1)*IF(ISNUMBER(E?),E?,' + data.defaultMU + ')/100),0)'
+                formula: 'ROUND(D?*(1+IF(F?="Yes",-1,1)*IF(ISNUMBER(E?),E?,' + data.defaultMU + ')/100),0)'
             },
             {
                 firstRow: 2,
@@ -327,6 +327,14 @@ async function onBomExpenses() {
                 firstRow: 2,
                 columns: ['B'],
                 numberFormat: '0'
+            },
+            {
+                color: 'lightgrey'
+            },
+            {
+                firstRow: 2,
+                columns: ['B','C','E'],
+                color: 'white'
             }
         ]
     });
