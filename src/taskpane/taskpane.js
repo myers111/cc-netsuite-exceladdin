@@ -213,6 +213,11 @@ async function onRevisionSummary() {
             },
             {
                 color: 'lightgrey'
+            },
+            {
+                firstRow: 2,
+                columns: ['A','B'],
+                color: 'white'
             }
         ]
     });
@@ -267,12 +272,12 @@ async function onBomItems() {
             {
                 firstRow: 2,
                 columns: ['F'],
-                formula: '=C?*E?'
+                formula: 'C?*E?'
             },
             {
                 firstRow: 2,
                 columns: ['L'],
-                formula: '=ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
+                formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
             },
             {
                 firstRow: 2,
@@ -283,6 +288,14 @@ async function onBomItems() {
                 firstRow: 2,
                 columns: ['C'],
                 numberFormat: '0'
+            },
+            {
+                color: 'lightgrey'
+            },
+            {
+                firstRow: 2,
+                columns: ['A','B','C','E','J'],
+                color: 'white'
             }
         ]
     });
@@ -298,12 +311,12 @@ async function onBomExpenses() {
             {
                 firstRow: 2,
                 columns: ['D'],
-                formula: '=C?*E? '
+                formula: 'C?*E? '
             },
             {
                 firstRow: 2,
                 columns: ['G'],
-                formula: '=ROUND(B?*(1+IF(F?="Yes",-1,1)*IF(ISNUMBER(E?),E?,' + data.defaultMU + ')/100),0)'
+                formula: 'ROUND(B?*(1+IF(F?="Yes",-1,1)*IF(ISNUMBER(E?),E?,' + data.defaultMU + ')/100),0)'
             },
             {
                 firstRow: 2,

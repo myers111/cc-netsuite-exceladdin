@@ -45,7 +45,7 @@ module.exports = {
 
                         for (var j = 0; j < range.columns.length; j++) {
 
-                            var rng = range;
+                            var rng = JSON.parse(JSON.stringify(range));
 
                             rng.firstColumn = range.columns[j];
                             rng.columns = 1;
@@ -55,7 +55,7 @@ module.exports = {
                     }
                     else {
 
-                        if (!range.columns) range.columns = options.data[0].length;
+                        range.columns = options.data[0].length;
 
                         setRange(sheet, range);
                     }
@@ -125,7 +125,7 @@ function setRange(sheet, options) {
         range.numberFormat = numberFormats;
     }
 
-    if (options.color)  range.format.fill.color = options.color;
+    if (options.color) range.format.fill.color = options.color;
 
     if (options.bold) range.format.font.bold = true;
 }
