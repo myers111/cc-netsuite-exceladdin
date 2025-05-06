@@ -38,7 +38,7 @@ module.exports = {
                     if (!range.rows) range.rows = options.data.length - (range.firstRow ? range.firstRow - 1 : 0);
 
                     if (range.rows == 0) continue;
-                    
+
                     if (range.cell) {
 
                         setRange(sheet, range);
@@ -79,9 +79,13 @@ module.exports = {
 
             var sheet = context.workbook.worksheets.getActiveWorksheet();
 
-            sheet.getRange().clear();
+            var range = sheet.getRange();
 
-            sheet.getRange().format.useStandardWidth = true;
+            range.clear();
+
+            sheet.getRange('A1').select();
+
+            range.format.useStandardWidth = true;
             
             await context.sync();
         });

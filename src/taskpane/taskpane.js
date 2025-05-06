@@ -31,6 +31,7 @@ Office.onReady((info) => {
         initList('quote');
         initList('revision');
         initList('bom');
+        initList('labor');
 
         excel.initialize({
             excel: Excel
@@ -51,6 +52,7 @@ async function initList(id) {
     switch (id) {
         case 'revision':
         case 'bom':
+        case 'labor':
             break;
         default:
         {
@@ -75,10 +77,15 @@ async function initList(id) {
                 break;
             case 'revisions':
                 emptyList("#bomList");
+                emptyList("#laborList");
                 onRevisionChange();
                 break;
             case 'boms':
+                emptyList("#laborList");
                 onBomChange();
+                break;
+            case 'labors':
+                onLaborChange();
                 break;
         } 
     });
@@ -105,12 +112,13 @@ async function loadList(selector, path) {
         sel.append('<option value="' + data[i].id + '">' + data[i].name + '</option>');
     }
 
-    if (path != 'revisions')  sel.prepend('<option value=""></option>');
+    if (path != 'revisions' && path != 'labors') sel.prepend('<option value=""></option>');
 
     switch (path) {
         case 'revisions':
         case 'boms':
-            sel.prop("selectedIndex", 0).trigger('change');
+        case 'labors':
+                sel.prop("selectedIndex", 0).trigger('change');
     }
 }
 
@@ -126,6 +134,9 @@ function getOptions(path) {
     var options = {};
 
     switch (path) {
+        case 'labors':
+            var bomId = $('#bomList').val();
+            if (parseInt(bomId)) options['bomId'] = bomId;
         case 'boms':
             var revisionId = $('#revisionList').val();
             if (parseInt(revisionId)) options['revisionId'] = revisionId;
@@ -259,6 +270,8 @@ async function getBomData(buttonId) {
         options: {id: $('#bomList').val()}
     };
 
+    if (buttonId == 'labor') params.options['laborId'] = parseInt($('#laborList').val());
+
     return await api.get(params);
 }
 
@@ -342,22 +355,62 @@ async function onBomExpenses() {
 
 async function onBomLabor() {
 
+    await loadList('#laborList', 'labors');
+
+    await onLaborChange();
+
+    document.getElementById("laborControls").style.display = '';
+}
+
+async function onLaborChange() {
+
     var data = await getBomData("labor");
 
     excel.addData({
         data: getLaborArray(data.labor),
+        ranges: [
+            {
+                firstRow: 2,
+                columns: ['D'],
+                formula: 'B?*C?'
+            },
+            {
+                firstRow: 2,
+                columns: ['F'],
+                formula: 'ROUND(IF(ISNUMBER(E?),B?*E?,D?*(1+' + data.defaultMU + '/100)),0)'
+            },
+            {
+                firstRow: 2,
+                columns: ['C','D','E','F'],
+                numberFormat: '0.00'
+            },
+            {
+                firstRow: 2,
+                columns: ['B'],
+                numberFormat: '0'
+            },
+            {
+                color: 'lightgrey'
+            },
+            {
+                firstRow: 2,
+                columns: ['B','C','E'],
+                color: 'white'
+            }
+        ]
+
      });
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function getSummaryArray(items) {
+function getSummaryArray(data) {
 
     var dataArray = [['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote']];
 
-    for (var i = 0; i < items.length; i++) {
+    for (var i = 0; i < data.length; i++) {
     
-        var item = items[i];
+        var item = data[i];
 
         dataArray.push([
             item.quantity,
@@ -372,13 +425,13 @@ function getSummaryArray(items) {
     return dataArray;
 }
 
-function getOverviewArray(items) {
+function getOverviewArray(data) {
 
     var dataArray = [['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote']];
 
-    for (var i = 0; i < items.length; i++) {
+    for (var i = 0; i < data.length; i++) {
     
-        var item = items[i];
+        var item = data[i];
 
         dataArray.push([
             item.quantity,
@@ -393,13 +446,13 @@ function getOverviewArray(items) {
     return dataArray;
 }
 
-function getItemArray(items) {
+function getItemArray(data) {
 
     var dataArray = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
 
-    for (var i = 0; i < items.length; i++) {
+    for (var i = 0; i < data.length; i++) {
     
-        var item = items[i];
+        var item = data[i];
 
         var quantity = (item.quantity ? parseInt(item.quantity) : 0);
         var price = (item.price ? parseFloat(item.price) : 0);
@@ -425,13 +478,13 @@ function getItemArray(items) {
     return dataArray;
 }
 
-function getExpenseArray(expenses) {
+function getExpenseArray(data) {
 
     var dataArray = [['Account *','Quantity *','Price *','Amount','MU%','Discount','Quote']];
 
-    for (var i = 0; i < expenses.length; i++) {
+    for (var i = 0; i < data.length; i++) {
     
-        var expense = expenses[i];
+        var expense = data[i];
 
         var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
         var price = (expense.price ? parseFloat(expense.price) : 0);
@@ -452,32 +505,26 @@ function getExpenseArray(expenses) {
     return dataArray;
 }
 
-function getLaborArray(items) {
+function getLaborArray(data) {
 
-    var dataArray = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
+    data.sort((a, b) => (a.name > b.name ? 1 : (b.name > a.name ? -1 : 0) ));
 
-    for (var i = 0; i < items.length; i++) {
+    var dataArray = [['Item','Quantity','Cost','Ext. Cost','Sell Price','Quote']];
+
+    for (var i = 0; i < data.length; i++) {
     
-        var item = items[i];
+        var labor = data[i];
 
-        var quantity = (item.quantity ? parseInt(item.quantity) : 0);
-        var price = (item.price ? parseFloat(item.price) : 0);
-        var markup = (item.markup ? parseFloat(item.markup) : 0);
-        var defaultMU = (item.defaultMU ? parseFloat(item.defaultMU) : 0);
+        var quantity = (labor.quantity ? parseInt(labor.quantity) : 0);
+        var price = (labor.price ? parseFloat(labor.price) : 0);
 
         dataArray.push([
-            (item.itemId == NEW_ITEM ? item.newItem : item.name),
-            (item.itemId == NEW_ITEM ? item.newDescription : item.description),
-            quantity,
-            item.units,
-            price,
+            labor.name,
+            labor.quantity,
+            labor.cost,
             (quantity * price),
-            (item.vendorId ? item.vendor : item.newVendor),
-            item.manufacturer,
-            item.mpn,
-            (markup > 0 ? markup : ''),
-            (item.discount == 'T' ? 'Yes' : 'No'),
-            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
+            labor.sellPrice,
+            labor.quote
         ]);   
     }
 
@@ -487,6 +534,8 @@ function getLaborArray(items) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function setButton(id) {
+
+    if (id == getButton()) return;
 
     if (id == "summary" || id == "overview") document.getElementById("bomButtons").style.display = 'none';
 
@@ -502,11 +551,13 @@ function resetButtons() {
     document.getElementById("items").className = "";
     document.getElementById("expenses").className = "";
     document.getElementById("labor").className = "";
+
+    document.getElementById("laborControls").style.display = 'none';
 }
 
 function getButton() {
 
-    return $("#bomControls" + HIGHLIGHT_CLASS).attr("id");
+    return $("button." + HIGHLIGHT_CLASS).attr("id");
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
