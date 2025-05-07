@@ -18,20 +18,18 @@ Office.onReady((info) => {
 
         window.onload = onRefresh;
 
-        document.getElementById("summary").onclick = onRevisionSummary;
-        document.getElementById("overview").onclick = onRevisionOverview;
-        document.getElementById("items").onclick = onBomItems;
-        document.getElementById("expenses").onclick = onBomExpenses;
-        document.getElementById("labor").onclick = onBomLabor;
-        //document.getElementById("reload").onclick = onReload;
-        //document.getElementById("save").onclick = onSave;
-
         initList('customer');
         initList('project');
         initList('quote');
         initList('revision');
         initList('bom');
         initList('labor');
+
+        initButton("summary");
+        initButton("overview");
+        initButton("items");
+        initButton("expenses");
+        initButton("labor");
 
         excel.initialize({
             excel: Excel
@@ -46,52 +44,31 @@ async function  onRefresh() {
 
 async function initList(id) {
 
-    var path = id + 's';
     var selector = '#' + id + 'List';
 
     switch (id) {
-        case 'revision':
-        case 'bom':
-        case 'labor':
+        case 'customer':
+        case 'project':
+        case 'quote':
+            $(selector).focus(function() { loadList(id); });
             break;
         default:
-        {
-            $(selector).focus(function() {
-            
-                loadList(selector, path);
-            });
-        }
     }
 
-    $(selector).on('change', function() {
-
-        switch (path) {
-            case 'customers':
-                emptyList("#projectList");
-            case 'projects':
-                emptyList("#quoteList");
-            case 'quotes':
-                emptyList("#revisionList");
-                emptyList("#bomList");
-                onQuoteChange();
-                break;
-            case 'revisions':
-                emptyList("#bomList");
-                emptyList("#laborList");
-                onRevisionChange();
-                break;
-            case 'boms':
-                emptyList("#laborList");
-                onBomChange();
-                break;
-            case 'labors':
-                onLaborChange();
-                break;
-        } 
-    });
+    $(selector).on('change', function() { onChange(id); });
 }
 
-async function loadList(selector, path) {
+async function initButton(id) {
+
+    var selector = '#' + id;
+
+    $(selector).on('click', function() { onClick(id); });
+}
+
+async function loadList(id) {
+
+    var selector = '#' + id + 'List';
+    var path = id + 's';
 
     if ($(selector + ' option').length) return;
 
@@ -99,7 +76,7 @@ async function loadList(selector, path) {
 
     var params = {path: path};
 
-    var options = getOptions(path);
+    var options = getOptions(id);
 
     if (options) params['options'] = options;
 
@@ -112,41 +89,42 @@ async function loadList(selector, path) {
         sel.append('<option value="' + data[i].id + '">' + data[i].name + '</option>');
     }
 
-    if (path != 'revisions' && path != 'labors') sel.prepend('<option value=""></option>');
-
-    switch (path) {
-        case 'revisions':
-        case 'boms':
-        case 'labors':
-                sel.prop("selectedIndex", 0).trigger('change');
+    switch (id) {
+        case 'customer':
+        case 'project':
+        case 'quote':
+        case 'bom':
+            sel.prepend('<option value=""></option>');
+            break;
+        default:                
     }
+
+    sel.prop("selectedIndex", 0).trigger('change');
 }
 
-async function emptyList(selector) {
+async function emptyList(id) {
 
-    var sel = $(selector);
-
-    sel.empty();
+    $('#' + id + 'List').empty();
 }
 
-function getOptions(path) {
+function getOptions(id) {
 
     var options = {};
 
-    switch (path) {
-        case 'labors':
+    switch (id) {
+        case 'labor':
             var bomId = $('#bomList').val();
             if (parseInt(bomId)) options['bomId'] = bomId;
-        case 'boms':
+        case 'bom':
             var revisionId = $('#revisionList').val();
             if (parseInt(revisionId)) options['revisionId'] = revisionId;
-        case 'revisions':
+        case 'revision':
             var quoteId = $('#quoteList').val();
             if (parseInt(quoteId)) options['quoteId'] = quoteId;
-        case 'quotes':
+        case 'quote':
             var projectId = $('#projectList').val();
             if (parseInt(projectId)) options['projectId'] = projectId;
-        case 'projects':
+        case 'project':
             var customerId = $('#customerList').val();
             if (parseInt(customerId)) options['customerId'] = customerId;
     }
@@ -154,36 +132,98 @@ function getOptions(path) {
     return (Object.keys(options).length == 0 ? null : options);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+async function onChange(id) {
 
-async function onQuoteChange() {
+    var buttonId = getButton();
 
-    var quoteId = $('#quoteList').val();
+    switch (id) {
+        case 'customer':
+            emptyList("project");
+        case 'project':
+            emptyList("quote");
+        case 'quote':
+            {
+                emptyList("revision");
+                emptyList("bom");
+                emptyList("labor");
 
-    if (quoteId) {
-        
-        await loadList('#revisionList', 'revisions');
+                var quoteId = $('#quoteList').val();
+
+                if (quoteId) {
+
+                    await loadList('revision');
+
+                    onClick('summary');
+                }
+
+                document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
+                document.getElementById("bomButtons").style.display = 'none';
+                document.getElementById("laborControls").style.display = 'none';
+            }
+            break;
+        case 'revision':
+            emptyList("bom");
+            emptyList("labor");
+            await loadList('bom');
+            onRevisionSummary();
+            break;
+        case 'bom':
+            emptyList("labor");
+            var bomId = $('#bomList').val();
+            document.getElementById("bomButtons").style.display = (bomId > 0 ? '' : 'none');
+            onClick(bomId > 0 ? 'items' : 'summary');
+            break;
+        case 'labor':
+            onBomLabor();
+            break;
+    }
+}
+
+async function onClick(id) {
+
+    var buttonId = getButton();
+
+    if (id == buttonId) return;
+
+    if (buttonId) document.getElementById(buttonId).className = "";
+
+    switch (id) {
+        case 'summary':
+            document.getElementById("bomButtons").style.display = 'none';
+            onRevisionSummary();
+            break;
+        case 'overview':
+            document.getElementById("bomButtons").style.display = 'none';
+            onRevisionOverview();
+            break;
+        case 'items':
+            onBomItems();
+            break;
+        case 'expenses':
+            onBomExpenses();
+            break;
+        case 'labor':
+            await loadList('labor');
+            onBomLabor();
+            break;
     }
 
-    document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
-    document.getElementById("revisionButtons").style.display = (quoteId > 0 ? '' : 'none');
+    document.getElementById("laborControls").style.display = (id == 'labor' ? '' : 'none');
 
-    document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
+    document.getElementById(id).className = HIGHLIGHT_CLASS;
 }
 
-async function onRevisionChange() {
+function getButton() {
 
-    onRevisionSummary();
-
-    await loadList('#bomList', 'boms');
+    return $("button." + HIGHLIGHT_CLASS).attr("id");
 }
 
-async function getRevisionData(buttonId) {
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    setButton(buttonId);
+async function getRevisionData(id) {
 
     var params = {
-        path: 'revision-' + buttonId,
+        path: 'revision-' + id,
         options: {
             id: $('#revisionList').val(),
             quoteId: $('#quoteList').val()
@@ -245,32 +285,14 @@ async function onRevisionOverview() {
     });
 }
 
-async function onBomChange() {
-
-    var bomOptionCount = $('#bomList option').length;
-
-    document.getElementById("bomControls").style.display = (bomOptionCount > 1 ? '' : 'none');
-
-    var bomId = $('#bomList').val();
-
-    document.getElementById("bomButtons").style.display = (bomId > 0 ? '' : 'none');
-
-    if (bomId > 0)
-        onBomItems();
-    else
-        onRevisionSummary();
-}
-
-async function getBomData(buttonId) {
-
-    setButton(buttonId);
+async function getBomData(id) {
 
     var params = {
-        path: 'bom-' + buttonId,
+        path: 'bom-' + id,
         options: {id: $('#bomList').val()}
     };
 
-    if (buttonId == 'labor') params.options['laborId'] = parseInt($('#laborList').val());
+    if (id == 'labor') params.options['laborId'] = parseInt($('#laborList').val());
 
     return await api.get(params);
 }
@@ -354,15 +376,6 @@ async function onBomExpenses() {
 }
 
 async function onBomLabor() {
-
-    await loadList('#laborList', 'labors');
-
-    await onLaborChange();
-
-    document.getElementById("laborControls").style.display = '';
-}
-
-async function onLaborChange() {
 
     var data = await getBomData("labor");
 
@@ -529,35 +542,6 @@ function getLaborArray(data) {
     }
 
     return dataArray;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-function setButton(id) {
-
-    if (id == getButton()) return;
-
-    if (id == "summary" || id == "overview") document.getElementById("bomButtons").style.display = 'none';
-
-    resetButtons();
-
-    document.getElementById(id).className = HIGHLIGHT_CLASS;
-}
-
-function resetButtons() {
-
-    document.getElementById("summary").className = "";
-    document.getElementById("overview").className = "";
-    document.getElementById("items").className = "";
-    document.getElementById("expenses").className = "";
-    document.getElementById("labor").className = "";
-
-    document.getElementById("laborControls").style.display = 'none';
-}
-
-function getButton() {
-
-    return $("button." + HIGHLIGHT_CLASS).attr("id");
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

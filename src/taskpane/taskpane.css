@@ -34,9 +34,13 @@ main button,
 main span,
 main select,
 main div {
-    padding: 3px;
     width: 100%;
     margin-top: 3px;
+}
+
+main button,
+main select {
+    padding: 3px;
 }
 
 button.highLight {
