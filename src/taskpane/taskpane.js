@@ -155,7 +155,10 @@ async function onChange(id) {
 
                     onClick('summary');
                 }
+                else {
 
+                    excel.clearData();
+                }
                 document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
                 document.getElementById("bomButtons").style.display = 'none';
                 document.getElementById("laborControls").style.display = 'none';
