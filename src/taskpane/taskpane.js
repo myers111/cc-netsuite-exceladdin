@@ -18,6 +18,9 @@ Office.onReady((info) => {
 
         window.onload = onRefresh;
 
+        document.getElementById("reload").onclick = onReload;
+        document.getElementById("save").onclick = onSave;
+
         initList('customer');
         initList('project');
         initList('quote');
@@ -159,9 +162,11 @@ async function onChange(id) {
 
                     excel.clearData();
                 }
+
                 document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
                 document.getElementById("bomButtons").style.display = 'none';
                 document.getElementById("laborControls").style.display = 'none';
+                document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
             }
             break;
         case 'revision':
@@ -349,7 +354,7 @@ async function onBomExpenses() {
             {
                 firstRow: 2,
                 columns: ['D'],
-                formula: 'C?*E?'
+                formula: 'B?*C?'
             },
             {
                 firstRow: 2,
@@ -443,21 +448,21 @@ function getSummaryArray(data) {
 
 function getOverviewArray(data) {
 
-    var dataArray = [['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote']];
+    var dataArray = [
+        ['Quote','','','',0,'','GM','Sell'],
+        ['MU (Default)','','','',data.defaultMU,'',0,0],
+        ['GM','','','',0,'',0,0],
+        ['MU','','Cost','Sell',0,'',0,0],
+        ['Labor','',0,0,0,'',0,0],
+        ['Material','',0,0,0,'',0,0],
+        ['Misc.','',0,0,0,'',0,0],
+        ['','','','','','',0,0],
+        ['Qty.','','','Cost','Ext. Cost','',0,0],
+        ['Hours','','','','','',0,0],
+        ['Total','','','',0,'',0,0],
+    ];
 
-    for (var i = 0; i < data.length; i++) {
-    
-        var item = data[i];
-
-        dataArray.push([
-            item.quantity,
-            item.desc,
-            item.cost,
-            item.quantity * item.cost,
-            item.quote,
-            item.quantity * item.quote
-        ]);   
-    }
+    dataArray.splice(10, 0, getHoursArray(data.hours));
 
     return dataArray;
 }
@@ -547,9 +552,177 @@ function getLaborArray(data) {
     return dataArray;
 }
 
+function getHoursArray(data, summary = true) {
+
+    var hoursArray = [];
+
+    for (var i = 0; i < data.length; i++) {
+    
+        var hours = data[i];
+
+        var array = [hours.quantity,hours.desc];   
+
+        if (!summary) {
+
+            array.push('','');   
+        }
+
+        array.push(hours.cost,0);   
+
+        if (summary) {
+
+            array.push('','','');   
+        }
+        else {
+
+            array.push(0,0,0,0,0,0);   
+        }
+
+        hoursArray.push(array);   
+    }
+
+    return hoursArray;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+async function onReload() {
+
+    var buttonId = getButton();
+
+    switch (buttonId) {
+        case 'summary':
+            reloadSummary();
+            break;
+        case 'overview':
+            reloadOverview();
+            break;
+        case 'items':
+            reloadItems();
+            break;
+        case 'expenses':
+            reloadExpenses();
+            break;
+        case 'labor':
+            reloadLabor();
+            break;
+    }
+}
+
+async function onSave() {
+
+    var buttonId = getButton();
+
+    switch (buttonId) {
+        case 'summary':
+            saveSummary();
+            break;
+        case 'overview':
+            saveOverview();
+            break;
+        case 'items':
+            saveItems();
+            break;
+        case 'expenses':
+            saveExpenses();
+            break;
+        case 'labor':
+            saveLabor();
+            break;
+    }
+}
+
+async function saveSummary() {
+
+    var quoteId = $('#quoteList').val();
+
+    if (!quoteId) return;
+
+    try {
+
+        await Excel.run(async (context) => {
+
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
+
+            var range = sheet.getUsedRange();
+
+            range.load("values");
+
+            await context.sync();
+
+            range.values.shift();
+
+            var quote = {
+                id: quoteId,
+                items: []
+            };
+
+            for (var i = 0; i < range.values.length; i++) {
+            
+                var values = range.values[i];
+
+                //if (!values[0].length) break;
+
+                quote.items.push({
+                    quantity: values[0],
+                    description: values[1]
+                });
+            }
+
+            var params = {
+                path: 'quote-summary',
+                options: {quote: quote}
+            };
+
+            await api.post(params);
+        });
+    }
+    catch (error) {
+
+        console.error(error);
+    }
+}
+
+async function saveOverview() {
+
+    var quoteId = $('#quoteList').val();
+
+    if (!quoteId) return;
+
+    try {
+
+        await Excel.run(async (context) => {
+
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
+
+            var range = sheet.getRange('E2');
+
+            range.load("values");
+
+            await context.sync();
+
+            var quote = {
+                id: quoteId,
+                defaultMU: range.values[0].values[0]
+            };
+
+            var params = {
+                path: 'quote-overview',
+                options: {quote: quote}
+            };
+
+            await api.post(params);
+        });
+    }
+    catch (error) {
+
+        console.error(error);
+    }
+}
+
 async function saveItems() {
+
+    var bomId = $('#bomList').val();
 
     try {
 
@@ -591,7 +764,110 @@ async function saveItems() {
             }
 
             var params = {
-                path: 'bom',
+                path: 'bom-items',
+                options: {bom: bom}
+            };
+
+            await api.post(params);
+        });
+    }
+    catch (error) {
+
+        console.error(error);
+    }
+}
+
+async function saveExpenses() {
+
+    var bomId = $('#bomList').val();
+
+    try {
+
+        await Excel.run(async (context) => {
+
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
+
+            var range = sheet.getUsedRange();
+
+            range.load("values");
+
+            await context.sync();
+
+            range.values.shift();
+
+            var bom = {
+                id: bomId,
+                expenses: []
+            };
+
+            for (var i = 0; i < range.values.length; i++) {
+            
+                var values = range.values[i];
+
+                if (!values[0].length) break;
+
+                bom.expenses.push({
+                    quantity: values[1],
+                    price: values[2],
+                    markUp: values[4],
+                    discount: values[5]
+                });
+            }
+
+            var params = {
+                path: 'bom-expenses',
+                options: {bom: bom}
+            };
+
+            await api.post(params);
+        });
+    }
+    catch (error) {
+
+        console.error(error);
+    }
+}
+
+async function saveLabor() {
+
+    var bomId = $('#bomList').val();
+    var laborId = $('#laborList').val();
+
+    try {
+
+        await Excel.run(async (context) => {
+
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
+
+            var range = sheet.getUsedRange();
+
+            range.load("values");
+
+            await context.sync();
+
+            range.values.shift();
+
+            var bom = {
+                id: bomId,
+                laborId: laborId,
+                labor: []
+            };
+
+            for (var i = 0; i < range.values.length; i++) {
+            
+                var values = range.values[i];
+
+                if (!values[0].length) break;
+
+                bom.labor.push({
+                    quantity: values[1],
+                    cost: values[2],
+                    sell: values[4]
+                });
+            }
+
+            var params = {
+                path: 'bom-labor',
                 options: {bom: bom}
             };
 
