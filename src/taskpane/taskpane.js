@@ -24,15 +24,9 @@ Office.onReady((info) => {
         initList('customer');
         initList('project');
         initList('quote');
-        initList('revision');
-        initList('bom');
-        initList('labor');
+        initList('revision', false);
 
         initButton("summary");
-        initButton("overview");
-        initButton("items");
-        initButton("expenses");
-        initButton("labor");
 
         excel.initialize({
             excel: Excel
@@ -45,18 +39,11 @@ async function  onRefresh() {
     excel.clearData();
 }
 
-async function initList(id) {
+async function initList(id, onFocus = true) {
 
     var selector = '#' + id + 'List';
 
-    switch (id) {
-        case 'customer':
-        case 'project':
-        case 'quote':
-            $(selector).focus(function() { loadList(id); });
-            break;
-        default:
-    }
+    if (onFocus) $(selector).focus(function() { loadList(id); });
 
     $(selector).on('change', function() { onChange(id); });
 }
@@ -87,22 +74,14 @@ async function loadList(id) {
 
     if (data.length == 0) return;
 
+    sel.append('<option value=""></option>');
+
     for (var i = 0; i < data.length; i++) {
 
-        sel.append('<option value="' + data[i].id + '">' + data[i].name + '</option>');
-    }
+        var d = data[i];
 
-    switch (id) {
-        case 'customer':
-        case 'project':
-        case 'quote':
-        case 'bom':
-            sel.prepend('<option value=""></option>');
-            break;
-        default:                
+        sel.append('<option value="' + d.id + '"' + (d.selected ? ' selected' : '') + '>' + d.name + '</option>');
     }
-
-    sel.prop("selectedIndex", 0).trigger('change');
 }
 
 async function emptyList(id) {
@@ -115,12 +94,6 @@ function getOptions(id) {
     var options = {};
 
     switch (id) {
-        case 'labor':
-            var bomId = $('#bomList').val();
-            if (parseInt(bomId)) options['bomId'] = bomId;
-        case 'bom':
-            var revisionId = $('#revisionList').val();
-            if (parseInt(revisionId)) options['revisionId'] = revisionId;
         case 'revision':
             var quoteId = $('#quoteList').val();
             if (parseInt(quoteId)) options['quoteId'] = quoteId;
@@ -137,7 +110,7 @@ function getOptions(id) {
 
 async function onChange(id) {
 
-    var buttonId = getButton();
+    excel.clearData();
 
     switch (id) {
         case 'customer':
@@ -145,45 +118,11 @@ async function onChange(id) {
         case 'project':
             emptyList("quote");
         case 'quote':
-            {
-                emptyList("revision");
-                emptyList("bom");
-                emptyList("labor");
-
-                var quoteId = $('#quoteList').val();
-
-                if (quoteId) {
-
-                    await loadList('revision');
-
-                    onClick('summary');
-                }
-                else {
-
-                    excel.clearData();
-                }
-
-                document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
-                document.getElementById("bomButtons").style.display = 'none';
-                document.getElementById("laborControls").style.display = 'none';
-                document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
-            }
+            emptyList("revision");
+            await onQuote();
             break;
         case 'revision':
-            emptyList("bom");
-            emptyList("labor");
-            await loadList('bom');
-            onRevisionSummary();
-            break;
-        case 'bom':
-            emptyList("labor");
-            var bomId = $('#bomList').val();
-            document.getElementById("bomButtons").style.display = (bomId > 0 ? '' : 'none');
-            onClick(bomId > 0 ? 'items' : 'summary');
-            break;
-        case 'labor':
-            onBomLabor();
-            break;
+            await onRevision();
     }
 }
 
@@ -197,28 +136,33 @@ async function onClick(id) {
 
     switch (id) {
         case 'summary':
-            document.getElementById("bomButtons").style.display = 'none';
-            onRevisionSummary();
+            onSummary();
             break;
-        case 'overview':
-            document.getElementById("bomButtons").style.display = 'none';
-            onRevisionOverview();
-            break;
-        case 'items':
-            onBomItems();
-            break;
-        case 'expenses':
-            onBomExpenses();
-            break;
-        case 'labor':
-            await loadList('labor');
+        default:
             onBomLabor();
             break;
     }
 
-    document.getElementById("laborControls").style.display = (id == 'labor' ? '' : 'none');
-
     document.getElementById(id).className = HIGHLIGHT_CLASS;
+}
+
+function addButtons(boms) {
+
+    removeButtons();
+
+    for (var i = 0; i < boms.length; i++) {
+                
+        var bom = boms[i];
+
+        $("#bomButtons").append('<button id="bom' + bom.id + '">' + bom.name + '</button>');
+
+        initButton("bom" + bom.id);
+    }
+}
+
+function removeButtons() {
+
+    $("#bomButtons").empty();
 }
 
 function getButton() {
@@ -228,28 +172,57 @@ function getButton() {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async function getRevisionData(id) {
+async function onQuote() {
+
+    var quoteId = $('#quoteList').val();
+
+    if (quoteId) {
+
+        await loadList('revision');
+
+        onRevision();
+    }
+    else {
+
+        removeButtons();
+    }
+
+    document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
+    document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
+}
+
+async function onRevision() {
 
     var params = {
-        path: 'revision-' + id,
+        path: 'revision-boms',
         options: {
             id: $('#revisionList').val(),
             quoteId: $('#quoteList').val()
         }
     };
 
-    return await api.get(params);
+    var data = await api.get(params);
+
+    addButtons(data);
+
+    onClick("summary");
 }
 
-async function onRevisionSummary() {
+async function onSummary() {
 
-    $('#bomList').val(0);
+    var params = {
+        path: 'revision-summary',
+        options: {
+            id: $('#revisionList').val(),
+            quoteId: $('#quoteList').val()
+        }
+    };
 
-    var data = await getRevisionData("summary");
+    var data = await api.get(params);
 
     excel.addData({
-        data: getSummaryArray(data),
-        ranges: [
+        data: getRevisionArray(data),
+/*        ranges: [
             {
                 firstRow: 2,
                 columns: ['D'],
@@ -279,18 +252,7 @@ async function onRevisionSummary() {
                 color: 'white'
             }
         ]
-    });
-}
-
-async function onRevisionOverview() {
-
-    var data = await api.get({
-        path: 'revision-overview',
-        options: {
-            id: $('#revisionList').val(),
-            quoteId: $('#quoteList').val()
-        }
-    });
+*/    });
 }
 
 async function getBomData(id) {
@@ -425,13 +387,31 @@ async function onBomLabor() {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function getSummaryArray(data) {
+function getRevisionArray(data) {
 
-    var dataArray = [['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote']];
+    var dataArray = [
+        ['Quote','','',0,'','GM','Sell'],
+        ['MU (Default)','','',data.defaultMU,'',0,0],
+        ['GM','','',0,'',0,0],
+        ['MU','Cost','Sell',0,'',0,0],
+        ['Labor',0,0,0,'',0,0],
+        ['Material',0,0,0,'',0,0],
+        ['Misc.',0,0,0,'',0,0],
+        ['','','','','',0,0],
+        ['Hours','','','','',0,0],
+        ['Qty.','','Cost','Ext. Cost','',0,0],
+        ['Total','','',0,'','',''],
+        ['','','','','','',''],
+        ['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote','']
+    ];
 
-    for (var i = 0; i < data.length; i++) {
+    var hours = getHoursArray(data.hours);
+
+    if (hours.length) dataArray.splice(10, 0, hours);
+
+    for (var i = 0; i < data.items.length; i++) {
     
-        var item = data[i];
+        var item = data.items[i];
 
         dataArray.push([
             item.quantity,
@@ -439,35 +419,17 @@ function getSummaryArray(data) {
             item.cost,
             item.quantity * item.cost,
             item.quote,
-            item.quantity * item.quote
+            item.quantity * item.quote,
+            ''
         ]);   
     }
 
-    return dataArray;
-}
-
-function getOverviewArray(data) {
-
-    var dataArray = [
-        ['Quote','','','',0,'','GM','Sell'],
-        ['MU (Default)','','','',data.defaultMU,'',0,0],
-        ['GM','','','',0,'',0,0],
-        ['MU','','Cost','Sell',0,'',0,0],
-        ['Labor','',0,0,0,'',0,0],
-        ['Material','',0,0,0,'',0,0],
-        ['Misc.','',0,0,0,'',0,0],
-        ['','','','','','',0,0],
-        ['Qty.','','','Cost','Ext. Cost','',0,0],
-        ['Hours','','','','','',0,0],
-        ['Total','','','',0,'',0,0],
-    ];
-
-    dataArray.splice(10, 0, getHoursArray(data.hours));
+    dataArray.push(['Total','','',0,'','',0]);   
 
     return dataArray;
 }
 
-function getItemArray(data) {
+function getBomArray(data) {
 
     var dataArray = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
 
