@@ -33,33 +33,42 @@ module.exports = {
 
                 for (var i = 0; i < options.ranges.length; i++) {
 
-                    var range = options.ranges[i];
+                    var rangeOptions = options.ranges[i];
 
-                    if (!range.rows) range.rows = options.data.length - (range.firstRow ? range.firstRow - 1 : 0);
+                    if (!rangeOptions.rows) rangeOptions.rows = (rangeOptions.cells ? 1 : options.data.length - (rangeOptions.firstRow ? rangeOptions.firstRow - 1 : 0));
 
-                    if (range.rows == 0) continue;
+                    if (rangeOptions.rows == 0) continue;
 
-                    if (range.cell) {
+                    if (rangeOptions.cells) {
 
-                        setRange(sheet, range);
+                        for (var j = 0; j < rangeOptions.cells.length; j++) {
+    
+                            var range = sheet.getRange(rangeOptions.cells[j]);
+                
+                            setRange(range, rangeOptions);
+                        }
                     }
-                    else if (range.columns) {
+                    else if (rangeOptions.columns) {
 
-                        for (var j = 0; j < range.columns.length; j++) {
+                        for (var j = 0; j < rangeOptions.columns.length; j++) {
 
-                            var rng = JSON.parse(JSON.stringify(range));
+                            var rng = JSON.parse(JSON.stringify(rangeOptions));
 
-                            rng.firstColumn = range.columns[j];
+                            rng.firstColumn = rangeOptions.columns[j];
                             rng.columns = 1;
 
-                            setRange(sheet, rng);
+                            var range = sheet.getRange(getRangeString(rng));
+
+                            setRange(range, rangeOptions);
                         }
                     }
                     else {
 
-                        range.columns = options.data[0].length;
+                        rangeOptions.columns = options.data[0].length;
 
-                        setRange(sheet, range);
+                        var range = sheet.getRange(getRangeString(rangeOptions));
+
+                        setRange(range, rangeOptions);
                     }
                 }
             }
@@ -100,14 +109,7 @@ function getRangeString(options) {
     return (firstColumn + (options.rows ? firstRow : '') + ':' + String.fromCharCode(firstColumn.charCodeAt(0) + options.columns - 1) + (options.rows ? firstRow + options.rows - 1 : ''));
 }
 
-function setRange(sheet, options) {
-
-    var range = null;
-    
-    if (options.cell)
-        range = sheet.getRange(options.cell);
-    else
-        range = sheet.getRange(getRangeString(options));
+function setRange(range, options) {
 
     if (options.formula) {
 
@@ -115,7 +117,14 @@ function setRange(sheet, options) {
     
         for (var i = 0; i < options.rows; i++) {
     
-            formulas.push(['=' + options.formula.replaceAll('?', (i + options.firstRow))]);
+            if (options.cells) {
+
+                formulas.push(['=' + options.formula]);
+            }
+            else {
+
+                formulas.push(['=' + options.formula.replaceAll('?', (i + options.firstRow))]);
+            }
         }
 
         range.formulas = formulas;

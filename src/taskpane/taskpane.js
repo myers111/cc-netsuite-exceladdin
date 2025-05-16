@@ -139,7 +139,11 @@ async function onClick(id) {
             onSummary();
             break;
         default:
-            onBomLabor();
+            {
+                var bomId = parseInt(id.replace('bom', ''));
+
+                await onBom(bomId);
+            }
             break;
     }
 
@@ -222,58 +226,35 @@ async function onSummary() {
 
     excel.addData({
         data: getRevisionArray(data),
-/*        ranges: [
+        ranges: [
             {
-                firstRow: 2,
-                columns: ['D'],
-                formula: 'A?*C?'
+                cells: ['D1'],
+                formula: ('$F$' + (data.items.length + 14))
             },
             {
-                firstRow: 2,
-                columns: ['F'],
-                formula: 'A?*E?'
-            },
-            {
-                firstRow: 2,
-                columns: ['C','D','E','F'],
+                cells: ['D1'],
                 numberFormat: '0.00'
             },
             {
-                firstRow: 2,
-                columns: ['A'],
-                numberFormat: '0'
-            },
-            {
-                color: 'lightgrey'
-            },
-            {
-                firstRow: 2,
-                columns: ['A','B'],
-                color: 'white'
+                cells: ['D2'],
+                color: 'yellow'
             }
         ]
-*/    });
+    });
 }
 
-async function getBomData(id) {
+async function onBom(bomId) {
 
     var params = {
-        path: 'bom-' + id,
-        options: {id: $('#bomList').val()}
+        path: 'bom',
+        options: {id: bomId}
     };
 
-    if (id == 'labor') params.options['laborId'] = parseInt($('#laborList').val());
-
-    return await api.get(params);
-}
-
-async function onBomItems() {
-
-    var data = await getBomData("items");
+    var data = await api.get(params);
 
     excel.addData({
-        data: getItemArray(data.items),
-        ranges: [
+        data: getBomArray(data),
+/*        ranges: [
             {
                 firstRow: 2,
                 columns: ['F'],
@@ -303,9 +284,9 @@ async function onBomItems() {
                 color: 'white'
             }
         ]
-    });
+*/    });
 }
-
+/*
 async function onBomExpenses() {
 
     var data = await getBomData("expenses");
@@ -384,7 +365,7 @@ async function onBomLabor() {
 
      });
 }
-
+*/
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function getRevisionArray(data) {
@@ -424,23 +405,26 @@ function getRevisionArray(data) {
         ]);   
     }
 
-    dataArray.push(['Total','','',0,'','',0]);   
+    dataArray.push(['Total','','',0,'',0,'']);   
 
     return dataArray;
 }
 
 function getBomArray(data) {
 
-    var dataArray = [['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote']];
+    var dataArray = [
+        ['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote'],
+        ['Items','','','','','','','','','','','']
+    ];
 
-    for (var i = 0; i < data.length; i++) {
+    for (var i = 0; i < data.items.length; i++) {
     
-        var item = data[i];
+        var item = data.items[i];
 
         var quantity = (item.quantity ? parseInt(item.quantity) : 0);
         var price = (item.price ? parseFloat(item.price) : 0);
         var markup = (item.markup ? parseFloat(item.markup) : 0);
-        var defaultMU = (item.defaultMU ? parseFloat(item.defaultMU) : 0);
+        var defaultMU = (data.defaultMU ? parseFloat(data.defaultMU) : 0);
 
         dataArray.push([
             (item.itemId == NEW_ITEM ? item.newItem : item.name),
@@ -455,39 +439,47 @@ function getBomArray(data) {
             (markup > 0 ? markup : ''),
             (item.discount == 'T' ? 'Yes' : 'No'),
             (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
-        ]);   
+        ]);
     }
 
-    return dataArray;
-}
+    dataArray.push(['Labor','','','','','','','','','','','']);
 
-function getExpenseArray(data) {
+    var hours = getHoursArray(data.labor, false);
 
-    var dataArray = [['Account *','Quantity *','Price *','Amount','MU%','Discount','Quote']];
+    if (hours.length) dataArray = dataArray.concat(hours);
 
-    for (var i = 0; i < data.length; i++) {
+    dataArray.push(['Expenses','','','','','','','','','','','']);
+
+    for (var i = 0; i < data.expenses.length; i++) {
     
-        var expense = data[i];
+        var expense = data.expenses[i];
 
         var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
         var price = (expense.price ? parseFloat(expense.price) : 0);
         var markup = (expense.markup ? parseFloat(expense.markup) : 0);
-        var defaultMU = (expense.defaultMU ? parseFloat(expense.defaultMU) : 0);
+        var defaultMU = (data.defaultMU ? parseFloat(data.defaultMU) : 0);
 
         dataArray.push([
+            '',
             expense.name,
             quantity,
+            '',
             price,
             (quantity * price),
+            '',
+            '',
+            '',
             (markup > 0 ? markup : ''),
             (expense.discount == 'T' ? 'Yes' : 'No'),
             (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
         ]);   
+
+        dataArray.push(['Total','','','','',0,'','','','','',0]);
     }
 
     return dataArray;
 }
-
+/*
 function getLaborArray(data) {
 
     data.sort((a, b) => (a.name > b.name ? 1 : (b.name > a.name ? -1 : 0) ));
@@ -513,7 +505,7 @@ function getLaborArray(data) {
 
     return dataArray;
 }
-
+*/
 function getHoursArray(data, summary = true) {
 
     var hoursArray = [];
@@ -522,25 +514,14 @@ function getHoursArray(data, summary = true) {
     
         var hours = data[i];
 
-        var array = [hours.quantity,hours.desc];   
-
-        if (!summary) {
-
-            array.push('','');   
-        }
-
-        array.push(hours.cost,0);   
-
         if (summary) {
 
-            array.push('','','');   
+            hoursArray.push([hours.quantity,hours.name,hours.cost,0,'','','']);  
         }
         else {
 
-            array.push(0,0,0,0,0,0);   
+            hoursArray.push(['',hours.name,hours.quantity,'',0,0,'','','',0,0,0]);  
         }
-
-        hoursArray.push(array);   
     }
 
     return hoursArray;
