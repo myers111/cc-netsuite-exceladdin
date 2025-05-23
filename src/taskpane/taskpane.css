@@ -27,7 +27,6 @@ main {
     -webkit-align-items: center;
     align-items: center;
     padding: 10px 20px;
-    height: 96%;
 }
 
 main button,
@@ -41,13 +40,4 @@ main div {
 main button,
 main select {
     padding: 3px;
-}
-
-button.highLight {
-    background-color: #2C73D9;
-    color: #ffffff;
-}
-
-#controls {
-    margin-top: auto;
 }

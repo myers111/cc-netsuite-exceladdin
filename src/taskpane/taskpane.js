@@ -140,7 +140,7 @@ async function onRevision() {
 
     await addSummary({
         defaultMU: data.defaultMU,
-        labor: [],
+        labor: (data.boms.length ? data.boms[0].labor : []),
         items: data.items
     });
 
@@ -157,7 +157,7 @@ async function addSummary(data) {
 
     var summaryArray = getSummaryArray(data);
 
-    var rowTotalHours = 11 + data.labor.length;
+    var rowTotalHours = (data.labor.length ? 11 + data.labor.length : 0);
     var rowTotalItems = summaryArray.length;
 
     await excel.addData("Summary", {
@@ -177,7 +177,7 @@ async function addSummary(data) {
             },
             {
                 range: ['B5'],
-                formula: '$D$' + rowTotalHours
+                formula: (rowTotalHours ? '$D$' + rowTotalHours : '=0')
             },
             {
                 range: ['C5'],
@@ -368,6 +368,8 @@ async function onBomLabor() {
 
 function getSummaryArray(data) {
 
+    var labor = getLaborArray(data.labor, true);
+
     var dataArray = [
         ['Quote','','',0,'','GM','Sell'],
         ['MU (Default)','','',data.defaultMU,'',0,0],
@@ -376,18 +378,22 @@ function getSummaryArray(data) {
         ['Labor',0,0,0,'',0,0],
         ['Material',0,0,0,'',0,0],
         ['Misc.',0,0,0,'',0,0],
-        ['','','','','',0,0],
-        ['Hours','','','','',0,0],
-        ['Qty.','','Cost','Ext. Cost','',0,0],
-        ['Total','','',0,'','',''],
         ['','','','','','',''],
-        ['Items','','','','',0,0],
-        ['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote','']
     ];
 
-    var labor = getHoursArray(data.labor);
+    if (labor.length) {
 
-    if (labor.length) dataArray.splice(10, 0, labor);
+        dataArray.push(['Labor','','','','','','']);
+        dataArray.push(['Qty.','','Cost','Ext. Cost','','','']);
+
+        dataArray = dataArray.concat(labor);
+
+        dataArray.push(['Total','','',0,'','','']);
+        dataArray.push(['','','','','','','']);
+    }
+
+    dataArray.push(['Items','','','','','','']);
+    dataArray.push(['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote','']);
 
     for (var i = 0; i < data.items.length; i++) {
     
@@ -443,9 +449,9 @@ function getBomArray(data) {
 
     dataArray.push(['Labor','','','','','','','','','','','']);
 
-    var hours = getHoursArray(data.labor, false);
+    var labor = getLaborArray(data.labor);
 
-    if (hours.length) dataArray = dataArray.concat(hours);
+    if (labor.length) dataArray = dataArray.concat(labor);
 
     dataArray.push(['Expenses','','','','','','','','','','','']);
 
@@ -478,100 +484,37 @@ function getBomArray(data) {
 
     return dataArray;
 }
-/*
-function getLaborArray(data) {
 
-    data.sort((a, b) => (a.name > b.name ? 1 : (b.name > a.name ? -1 : 0) ));
+function getLaborArray(data, summary = false) {
 
-    var dataArray = [['Item','Quantity','Cost','Ext. Cost','Sell Price','Quote']];
+    var laborArray = [];
 
     for (var i = 0; i < data.length; i++) {
     
         var labor = data[i];
 
-        var quantity = (labor.quantity ? parseInt(labor.quantity) : 0);
-        var price = (labor.price ? parseFloat(labor.price) : 0);
-
-        dataArray.push([
-            labor.name,
-            labor.quantity,
-            labor.cost,
-            (quantity * price),
-            labor.sellPrice,
-            labor.quote
-        ]);   
-    }
-
-    return dataArray;
-}
-*/
-function getHoursArray(data, summary = true) {
-
-    var hoursArray = [];
-
-    for (var i = 0; i < data.length; i++) {
-    
-        var hours = data[i];
-
         if (summary) {
 
-            hoursArray.push([hours.quantity,hours.name,hours.cost,0,'','','']);  
+            laborArray.push([labor.quantity,labor.name,labor.cost,0,'','','']);  
         }
         else {
 
-            hoursArray.push(['',hours.name,hours.quantity,'',0,0,'','','',0,0,0]);  
+            laborArray.push(['',labor.name,labor.quantity,'',0,0,'','','',0,0,0]);  
         }
     }
 
-    return hoursArray;
+    return laborArray;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async function onReload() {
 
-    var buttonId = getButton();
 
-    switch (buttonId) {
-        case 'summary':
-            reloadSummary();
-            break;
-        case 'overview':
-            reloadOverview();
-            break;
-        case 'items':
-            reloadItems();
-            break;
-        case 'expenses':
-            reloadExpenses();
-            break;
-        case 'labor':
-            reloadLabor();
-            break;
-    }
 }
 
 async function onSave() {
 
-    var buttonId = getButton();
-
-    switch (buttonId) {
-        case 'summary':
-            saveSummary();
-            break;
-        case 'overview':
-            saveOverview();
-            break;
-        case 'items':
-            saveItems();
-            break;
-        case 'expenses':
-            saveExpenses();
-            break;
-        case 'labor':
-            saveLabor();
-            break;
-    }
 }
 
 async function saveSummary() {
