@@ -8,8 +8,10 @@ const api = require('../modules/api.js');
 const excel = require('../modules/excel.js');
 
 const NEW_ITEM = 3757;
-const COLOR_HEADER = '#E7E6E6';
+//const COLOR_HEADER = '#E7E6E6';
 const COLOR_INPUT = '#C6E0B4';
+const LABEL_LABOR = 'Labor';
+const LABEL_ITEMS = 'Items';
 
 /* global console, document, Excel, Office */
 
@@ -157,89 +159,192 @@ async function addSummary(data) {
 
     var summaryArray = getSummaryArray(data);
 
-    var rowTotalHours = (data.labor.length ? 11 + data.labor.length : 0);
-    var rowTotalItems = summaryArray.length;
+    // Set first & last labor row (starts at 1)
+    
+    var rowLaborFirst = 0;
+    var rowLaborLast = 0;
 
+    var index = summaryArray.findLastIndex(el => el[0] == LABEL_LABOR);
+
+    if (index >= 0) {
+    
+        rowLaborFirst = index + 3;
+
+        index = summaryArray.findIndex(el => el[0] == 'Total');
+        
+        rowLaborLast = index;
+    }
+
+    // Set first & last items row (starts at 1)
+    
+    var rowItemsFirst = 0;
+    var rowItemsLast = 0;
+
+    index = summaryArray.findLastIndex(el => el[0] == LABEL_ITEMS);
+
+    if (index >= 0) {
+    
+        rowItemsFirst = index + 3;
+
+        index = summaryArray.findLastIndex(el => el[0] == 'Total');
+        
+        rowItemsLast = index;
+    }
+
+    var rowLaborTotal = (rowLaborLast ? rowLaborLast + 1 : 0);
+    var rowItemsTotal = rowItemsLast + 1;
+
+    var ranges = [
+        {
+            range: ['D1'],
+            formula: '$F$' + rowItemsTotal,
+            numberFormat: '$#,###.00'
+        },
+        {
+            range: ['D3'],
+            formula: '($D$1-$D$' + rowItemsTotal + ')/IF($D$1>0,$D$1,1)'
+        },
+        {
+            range: ['D4'],
+            formula: '($D$1-$D$' + rowItemsTotal + ')/IF($D$' + rowItemsTotal + '>0,$D$' + rowItemsTotal + ',1)'
+        },
+        {
+            range: ['B5'],
+            formula: (rowLaborTotal ? '$D$' + rowLaborTotal : '=0')
+        },
+        {
+            range: ['C5'],
+            formula: 'ROUNDUP($D$1*$D$5,0)'
+        },
+        {
+            range: ['D5'],
+            formula: ('IF($D$' + rowItemsTotal + '=0,0,$B$5/$D$' + rowItemsTotal + ')')
+        },
+        {
+            range: ['B6'],
+            formula: ('$D$' + rowItemsTotal + '-$D$' + rowLaborTotal)
+        },
+        {
+            range: ['C6'],
+            formula: '$D$1-$C$5'
+        },
+        {
+            range: ['D6'],
+            formula: ('IF($D$' + rowItemsTotal + '=0,0,$B$6/$D$' + rowItemsTotal + ')')
+        },
+        {
+            range: ['D7'],
+            formula: ('IF($D$' + rowItemsTotal + '=0,0,$B$7/$D$' + rowItemsTotal + ')')
+        },
+        {
+            range: ['F2'],
+            formula: '$F$3-0.01'
+        },
+        {
+            range: ['F3'],
+            formula: '$F$4-0.01'
+        },
+        {
+            range: ['F4'],
+            formula: '$D$3-0.01'
+        },
+        {
+            range: ['F5'],
+            formula: '$D$3+0.01'
+        },
+        {
+            range: ['F6'],
+            formula: '$F$5+0.01'
+        },
+        {
+            range: ['F7'],
+            formula: '$F$6+0.01'
+        },
+        {
+            range: ['G2'],
+            formula: 'IF(1-F2=0,$D$1,$D$1/(1-F2))'
+        },
+        {
+            range: ['G3'],
+            formula: 'IF(1-F3=0,$D$1,$D$1/(1-F3))'
+        },
+        {
+            range: ['G4'],
+            formula: 'IF(1-F4=0,$D$1,$D$1/(1-F4))'
+        },
+        {
+            range: ['G5'],
+            formula: 'IF(1-F5=0,$D$1,$D$1/(1-F5))'
+        },
+        {
+            range: ['G6'],
+            formula: 'IF(1-F6=0,$D$1,$D$1/(1-F6))'
+        },
+        {
+            range: ['G7'],
+            formula: 'IF(1-F7=0,$D$1,$D$1/(1-F7))'
+        },
+        {
+            range: ['D' + rowItemsFirst + ':D' + rowItemsLast],
+            formula: 'A?*C?'
+        },
+        {
+            range: ['F' + rowItemsFirst + ':F' + rowItemsLast],
+            formula: 'A?*E?'
+        },
+        {
+            range: ['D' + rowItemsTotal],
+            formula: ('SUM(D' + rowItemsFirst + ':D' + rowItemsLast + ')'),
+            numberFormat: '$#,###.00'
+        },
+        {
+            range: ['F' + rowItemsTotal],
+            formula: ('SUM(F' + rowItemsFirst + ':F' + rowItemsLast + ')'),
+            numberFormat: '$#,###.00'
+        },
+        {
+            range: ['D2:D7','F2:F7'],
+            numberFormat: '#,###.00%'
+        },
+/*        {
+            range: ['A1:D7'],
+            color: COLOR_HEADER
+        },
+*/        {
+            range: ['D2','A' + rowItemsFirst + ':A' + rowItemsLast,'B' + rowItemsFirst + ':B' + rowItemsLast],
+            color: COLOR_INPUT
+        }
+    ];
+
+    // Set currency format
+
+    var rngCurrencyFormat = {
+        range: ['B5:C7'],//,'G2:G7'
+        numberFormat: '$#,###.00'
+    };
+
+    if (rowLaborFirst) {
+        
+        rngCurrencyFormat.range.push('C' + rowLaborFirst + ':D' + rowLaborLast);
+        rngCurrencyFormat.range.push('D' + rowLaborTotal);
+    }
+
+    rngCurrencyFormat.range.push('C' + rowItemsFirst + ':F' + rowItemsLast);
+
+    ranges.push(rngCurrencyFormat);
+
+    // Set labor formulas
+
+    var rngFormula = [];
+/*
+    for (var i = 0; i < data.labor.length; i++) {
+
+        ranges.push
+    }
+*/
     await excel.addData("Summary", {
         data: summaryArray,
-        ranges: [
-            {
-                range: ['D1'],
-                formula: '$F$' + rowTotalItems
-            },
-            {
-                range: ['D3'],
-                formula: '($D$1-$D$' + rowTotalItems + ')/IF($D$1>0,$D$1,1)'
-            },
-            {
-                range: ['D4'],
-                formula: '($D$1-$D$' + rowTotalItems + ')/IF($D$' + rowTotalItems + '>0,$D$' + rowTotalItems + ',1)'
-            },
-            {
-                range: ['B5'],
-                formula: (rowTotalHours ? '$D$' + rowTotalHours : '=0')
-            },
-            {
-                range: ['C5'],
-                formula: 'ROUNDUP($D$1*$D$5,0)'
-            },
-            {
-                range: ['D5'],
-                formula: ('IF($D$' + rowTotalItems + '=0,0,$B$5/$D$' + rowTotalItems + ')')
-            },
-            {
-                range: ['B6'],
-                formula: ('$D$' + rowTotalItems + '-$D$' + rowTotalHours)
-            },
-            {
-                range: ['C6'],
-                formula: '$D$1-$C$5'
-            },
-            {
-                range: ['D6'],
-                formula: ('IF($D$' + rowTotalItems + '=0,0,$B$6/$D$' + rowTotalItems + ')')
-            },
-            {
-                range: ['D7'],
-                formula: ('IF($D$' + rowTotalItems + '=0,0,$B$7/$D$' + rowTotalItems + ')')
-            },
-            {
-                firstRow: (rowTotalHours + 4),
-                rows: data.items.length,
-                columns: ['D'],
-                formula: 'A?*C?'
-            },
-            {
-                firstRow: (rowTotalHours + 4),
-                rows: data.items.length,
-                columns: ['F'],
-                formula: 'A?*E?'
-            },
-            {
-                range: ['D' + rowTotalItems],
-                formula: ('SUM(D' + ((rowTotalHours + 4)) + ':D' + (rowTotalItems - 1) + ')')
-            },
-            {
-                range: ['F' + rowTotalItems],
-                formula: ('SUM(F' + ((rowTotalHours + 4)) + ':F' + (rowTotalItems - 1) + ')')
-            },
-            {
-                range: ['D1','B5:B7','C5:C6'],
-                numberFormat: '$#,###.00'
-            },
-            {
-                range: ['D2:D7'],
-                numberFormat: '#,###.00%'
-            },
-            {
-                range: ['A1:D7'],
-                color: COLOR_HEADER
-            },
-            {
-                range: ['D2'],
-                color: COLOR_INPUT
-            }
-        ]
+        ranges: ranges.concat(rngFormula)
     });
 }
 
@@ -375,15 +480,15 @@ function getSummaryArray(data) {
         ['MU (Default)','','',data.defaultMU,'',0,0],
         ['GM','','',0,'',0,0],
         ['MU','Cost','Sell',0,'',0,0],
-        ['Labor',0,0,0,'',0,0],
-        ['Material',0,0,0,'',0,0],
+        [LABEL_LABOR,0,0,0,'',0,0],
+        [LABEL_ITEMS,0,0,0,'',0,0],
         ['Misc.',0,0,0,'',0,0],
         ['','','','','','',''],
     ];
 
     if (labor.length) {
 
-        dataArray.push(['Labor','','','','','','']);
+        dataArray.push([LABEL_LABOR,'','','','','','']);
         dataArray.push(['Qty.','','Cost','Ext. Cost','','','']);
 
         dataArray = dataArray.concat(labor);
@@ -392,7 +497,7 @@ function getSummaryArray(data) {
         dataArray.push(['','','','','','','']);
     }
 
-    dataArray.push(['Items','','','','','','']);
+    dataArray.push([LABEL_ITEMS,'','','','','','']);
     dataArray.push(['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote','']);
 
     for (var i = 0; i < data.items.length; i++) {
@@ -489,18 +594,26 @@ function getLaborArray(data, summary = false) {
 
     var laborArray = [];
 
+    var groupName = '';
+
     for (var i = 0; i < data.length; i++) {
     
         var labor = data[i];
 
-        if (summary) {
+        if (groupName != labor.groupName) {
 
-            laborArray.push([labor.quantity,labor.name,labor.cost,0,'','','']);  
-        }
-        else {
+            groupName = labor.groupName;
 
-            laborArray.push(['',labor.name,labor.quantity,'',0,0,'','','',0,0,0]);  
+            if (summary)
+                laborArray.push([0,labor.groupName,'',0,'','','']);
+            else
+                laborArray.push(['',labor.groupName,0,'',0,'','','','',0,0,0]);
         }
+
+        if (summary)
+            laborArray.push([labor.quantity,labor.name,labor.cost,0,'','','']);
+        else
+            laborArray.push(['',labor.name,labor.quantity,'',0,0,'','','',0,0,0]);
     }
 
     return laborArray;

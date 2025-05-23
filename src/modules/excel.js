@@ -31,32 +31,13 @@ module.exports = {
 
                     var rangeOptions = options.ranges[i];
 
-                    if (rangeOptions.range) {
-
-                        for (var j = 0; j < rangeOptions.range.length; j++) {
+                    for (var j = 0; j < rangeOptions.range.length; j++) {
     
-                            var range = sheet.getRange(rangeOptions.range[j]).load(['rowIndex','rowCount','columnCount']);
+                        var range = sheet.getRange(rangeOptions.range[j]).load(['rowIndex','rowCount','columnCount']);
 
-                            await context.sync();
+                        await context.sync();
 
-                            setRange(range, rangeOptions);
-                        }
-                    }
-                    else if (rangeOptions.columns) {
-
-                        for (var j = 0; j < rangeOptions.columns.length; j++) {
-
-                            var rng = JSON.parse(JSON.stringify(rangeOptions)); // Replicate rangeOptions
-
-                            rng.firstColumn = rangeOptions.columns[j];
-                            rng.columns = 1;
-
-                            var range = sheet.getRange(getRangeString(rng)).load(['rowIndex','rowCount','columnCount']);
-
-                            await context.sync();
-                        
-                            setRange(range, rangeOptions);
-                        }
+                        setRange(range, rangeOptions);
                     }
                 }
             }
@@ -97,7 +78,7 @@ async function getSheet(context, sheetName = null) {
     var sheet = null;
 
     if (sheetName) {
-console.log(sheetName);
+
         sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
 
         sheet.load("isNullObject");
@@ -105,7 +86,7 @@ console.log(sheetName);
         await context.sync();
 
         if (sheet.isNullObject) {
-console.log("1");
+
             sheet = context.workbook.worksheets.getActiveWorksheet();
 
             var range = sheet.getUsedRangeOrNullObject(true);
@@ -115,13 +96,13 @@ console.log("1");
             await context.sync();
 
             if (range.isNullObject) {
-console.log("2");
+
                 sheet.name = sheetName;
 
                 await context.sync();
             }
             else {
-console.log("3");
+
                 sheet = context.workbook.worksheets.add(sheetName);
             }
         }
@@ -131,7 +112,7 @@ console.log("3");
         }
     }
     else {
-console.log("4");
+
         sheet = context.workbook.worksheets.getActiveWorksheet();
 
         await clearData(context);
@@ -171,10 +152,10 @@ function setRange(range, options) {
 
                 numberFormat.push(options.numberFormat);
             }
-
-            if (formula.length) formulas.push(formula);
-            if (numberFormat.length) numberFormats.push(numberFormat);
         }
+
+        if (formula.length) formulas.push(formula);
+        if (numberFormat.length) numberFormats.push(numberFormat);
     }
 
     if (formulas.length) range.formulas = formulas;
