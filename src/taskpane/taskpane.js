@@ -8,7 +8,8 @@ const api = require('../modules/api.js');
 const excel = require('../modules/excel.js');
 
 const NEW_ITEM = 3757;
-const HIGHLIGHT_CLASS = "highLight";
+const COLOR_HEADER = '#E7E6E6';
+const COLOR_INPUT = '#C6E0B4';
 
 /* global console, document, Excel, Office */
 
@@ -16,7 +17,9 @@ Office.onReady((info) => {
 
     if (info.host === Office.HostType.Excel) {
 
-        window.onload = onRefresh;
+        excel.initialize({
+            excel: Excel
+        });
 
         document.getElementById("reload").onclick = onReload;
         document.getElementById("save").onclick = onSave;
@@ -25,19 +28,8 @@ Office.onReady((info) => {
         initList('project');
         initList('quote');
         initList('revision', false);
-
-        initButton("summary");
-
-        excel.initialize({
-            excel: Excel
-        });
     }
 });
-
-async function  onRefresh() {
-
-    excel.clearData();
-}
 
 async function initList(id, onFocus = true) {
 
@@ -46,13 +38,6 @@ async function initList(id, onFocus = true) {
     if (onFocus) $(selector).focus(function() { loadList(id); });
 
     $(selector).on('change', function() { onChange(id); });
-}
-
-async function initButton(id) {
-
-    var selector = '#' + id;
-
-    $(selector).on('click', function() { onClick(id); });
 }
 
 async function loadList(id) {
@@ -110,8 +95,6 @@ function getOptions(id) {
 
 async function onChange(id) {
 
-    excel.clearData();
-
     switch (id) {
         case 'customer':
             emptyList("project");
@@ -126,54 +109,6 @@ async function onChange(id) {
     }
 }
 
-async function onClick(id) {
-
-    var buttonId = getButton();
-
-    if (id == buttonId) return;
-
-    if (buttonId) document.getElementById(buttonId).className = "";
-
-    switch (id) {
-        case 'summary':
-            onSummary();
-            break;
-        default:
-            {
-                var bomId = parseInt(id.replace('bom', ''));
-
-                await onBom(bomId);
-            }
-            break;
-    }
-
-    document.getElementById(id).className = HIGHLIGHT_CLASS;
-}
-
-function addButtons(boms) {
-
-    removeButtons();
-
-    for (var i = 0; i < boms.length; i++) {
-                
-        var bom = boms[i];
-
-        $("#bomButtons").append('<button id="bom' + bom.id + '">' + bom.name + '</button>');
-
-        initButton("bom" + bom.id);
-    }
-}
-
-function removeButtons() {
-
-    $("#bomButtons").empty();
-}
-
-function getButton() {
-
-    return $("button." + HIGHLIGHT_CLASS).attr("id");
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async function onQuote() {
@@ -186,10 +121,6 @@ async function onQuote() {
 
         onRevision();
     }
-    else {
-
-        removeButtons();
-    }
 
     document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
@@ -198,7 +129,7 @@ async function onQuote() {
 async function onRevision() {
 
     var params = {
-        path: 'revision-boms',
+        path: 'revision',
         options: {
             id: $('#revisionList').val(),
             quoteId: $('#quoteList').val()
@@ -207,71 +138,137 @@ async function onRevision() {
 
     var data = await api.get(params);
 
-    addButtons(data);
+    await addSummary({
+        defaultMU: data.defaultMU,
+        labor: [],
+        items: data.items
+    });
 
-    onClick("summary");
+    for (var i = 0; i < data.boms.length; i++) {
+
+        await addBom({
+            defaultMU: data.defaultMU,
+            bom: data.boms[i]
+        });
+    }
 }
 
-async function onSummary() {
+async function addSummary(data) {
 
-    var params = {
-        path: 'revision-summary',
-        options: {
-            id: $('#revisionList').val(),
-            quoteId: $('#quoteList').val()
-        }
-    };
+    var summaryArray = getSummaryArray(data);
 
-    var data = await api.get(params);
+    var rowTotalHours = 11 + data.labor.length;
+    var rowTotalItems = summaryArray.length;
 
-    excel.addData({
-        data: getRevisionArray(data),
+    await excel.addData("Summary", {
+        data: summaryArray,
         ranges: [
             {
-                cells: ['D1'],
-                formula: ('$F$' + (data.items.length + 14))
+                range: ['D1'],
+                formula: '$F$' + rowTotalItems
             },
             {
-                cells: ['D1'],
-                numberFormat: '0.00'
+                range: ['D3'],
+                formula: '($D$1-$D$' + rowTotalItems + ')/IF($D$1>0,$D$1,1)'
             },
             {
-                cells: ['D2'],
-                color: 'yellow'
+                range: ['D4'],
+                formula: '($D$1-$D$' + rowTotalItems + ')/IF($D$' + rowTotalItems + '>0,$D$' + rowTotalItems + ',1)'
+            },
+            {
+                range: ['B5'],
+                formula: '$D$' + rowTotalHours
+            },
+            {
+                range: ['C5'],
+                formula: 'ROUNDUP($D$1*$D$5,0)'
+            },
+            {
+                range: ['D5'],
+                formula: ('IF($D$' + rowTotalItems + '=0,0,$B$5/$D$' + rowTotalItems + ')')
+            },
+            {
+                range: ['B6'],
+                formula: ('$D$' + rowTotalItems + '-$D$' + rowTotalHours)
+            },
+            {
+                range: ['C6'],
+                formula: '$D$1-$C$5'
+            },
+            {
+                range: ['D6'],
+                formula: ('IF($D$' + rowTotalItems + '=0,0,$B$6/$D$' + rowTotalItems + ')')
+            },
+            {
+                range: ['D7'],
+                formula: ('IF($D$' + rowTotalItems + '=0,0,$B$7/$D$' + rowTotalItems + ')')
+            },
+            {
+                firstRow: (rowTotalHours + 4),
+                rows: data.items.length,
+                columns: ['D'],
+                formula: 'A?*C?'
+            },
+            {
+                firstRow: (rowTotalHours + 4),
+                rows: data.items.length,
+                columns: ['F'],
+                formula: 'A?*E?'
+            },
+            {
+                range: ['D' + rowTotalItems],
+                formula: ('SUM(D' + ((rowTotalHours + 4)) + ':D' + (rowTotalItems - 1) + ')')
+            },
+            {
+                range: ['F' + rowTotalItems],
+                formula: ('SUM(F' + ((rowTotalHours + 4)) + ':F' + (rowTotalItems - 1) + ')')
+            },
+            {
+                range: ['D1','B5:B7','C5:C6'],
+                numberFormat: '$#,###.00'
+            },
+            {
+                range: ['D2:D7'],
+                numberFormat: '#,###.00%'
+            },
+            {
+                range: ['A1:D7'],
+                color: COLOR_HEADER
+            },
+            {
+                range: ['D2'],
+                color: COLOR_INPUT
             }
         ]
     });
 }
 
-async function onBom(bomId) {
+async function addBom(data) {
 
-    var params = {
-        path: 'bom',
-        options: {id: bomId}
-    };
-
-    var data = await api.get(params);
-
-    excel.addData({
-        data: getBomArray(data),
+    await excel.addData(data.bom.name, {
+        data: getBomArray(data.bom),
 /*        ranges: [
             {
-                firstRow: 2,
+                firstRow: 3,
+                rows: data.items.length,
                 columns: ['F'],
                 formula: 'C?*E?'
             },
             {
-                firstRow: 2,
+                firstRow: 3,
+                rows: data.items.length,
                 columns: ['L'],
                 formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
             },
             {
-                firstRow: 2,
+                firstRow: 3,
+                rows: data.items.length,
                 columns: ['E','F','J'],
                 numberFormat: '0.00'
             },
             {
-                firstRow: 2,
+                firstRow: 3,
+                rows: data.items.length,
                 columns: ['C'],
                 numberFormat: '0'
             },
@@ -279,7 +276,8 @@ async function onBom(bomId) {
                 color: 'lightgrey'
             },
             {
-                firstRow: 2,
+                firstRow: 3,
+                rows: data.items.length,
                 columns: ['A','B','C','E','J'],
                 color: 'white'
             }
@@ -368,7 +366,7 @@ async function onBomLabor() {
 */
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function getRevisionArray(data) {
+function getSummaryArray(data) {
 
     var dataArray = [
         ['Quote','','',0,'','GM','Sell'],
@@ -383,12 +381,13 @@ function getRevisionArray(data) {
         ['Qty.','','Cost','Ext. Cost','',0,0],
         ['Total','','',0,'','',''],
         ['','','','','','',''],
+        ['Items','','','','',0,0],
         ['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote','']
     ];
 
-    var hours = getHoursArray(data.hours);
+    var labor = getHoursArray(data.labor);
 
-    if (hours.length) dataArray.splice(10, 0, hours);
+    if (labor.length) dataArray.splice(10, 0, labor);
 
     for (var i = 0; i < data.items.length; i++) {
     
@@ -413,7 +412,7 @@ function getRevisionArray(data) {
 function getBomArray(data) {
 
     var dataArray = [
-        ['Item *','Description','Quantity *','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote'],
+        ['Item','Description','Quantity','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote'],
         ['Items','','','','','','','','','','','']
     ];
 

@@ -6,21 +6,17 @@ module.exports = {
     initialize: async function (options) {
 
         objExcel = options.excel;
-
+/*
         Excel.run(async (context) => {
 
-            context.workbook.worksheets.getActiveWorksheet().name = 'NetSuite';
-    
-            await context.sync();
+            await getSheet(context, "Summary");
         });
-    },
-    addData: async function (options) {
+*/    },
+    addData: async function (sheetName, options) {
     
         await objExcel.run(async (context) => {
 
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            sheet.getRange().clear();
+            var sheet = await getSheet(context, sheetName);
 
             var rangeString = getRangeString({
                 rows: options.data.length,
@@ -35,16 +31,14 @@ module.exports = {
 
                     var rangeOptions = options.ranges[i];
 
-                    if (!rangeOptions.rows) rangeOptions.rows = (rangeOptions.cells ? 1 : options.data.length - (rangeOptions.firstRow ? rangeOptions.firstRow - 1 : 0));
+                    if (rangeOptions.range) {
 
-                    if (rangeOptions.rows == 0) continue;
-
-                    if (rangeOptions.cells) {
-
-                        for (var j = 0; j < rangeOptions.cells.length; j++) {
+                        for (var j = 0; j < rangeOptions.range.length; j++) {
     
-                            var range = sheet.getRange(rangeOptions.cells[j]);
-                
+                            var range = sheet.getRange(rangeOptions.range[j]).load(['rowIndex','rowCount','columnCount']);
+
+                            await context.sync();
+
                             setRange(range, rangeOptions);
                         }
                     }
@@ -52,23 +46,17 @@ module.exports = {
 
                         for (var j = 0; j < rangeOptions.columns.length; j++) {
 
-                            var rng = JSON.parse(JSON.stringify(rangeOptions));
+                            var rng = JSON.parse(JSON.stringify(rangeOptions)); // Replicate rangeOptions
 
                             rng.firstColumn = rangeOptions.columns[j];
                             rng.columns = 1;
 
-                            var range = sheet.getRange(getRangeString(rng));
+                            var range = sheet.getRange(getRangeString(rng)).load(['rowIndex','rowCount','columnCount']);
 
+                            await context.sync();
+                        
                             setRange(range, rangeOptions);
                         }
-                    }
-                    else {
-
-                        rangeOptions.columns = options.data[0].length;
-
-                        var range = sheet.getRange(getRangeString(rangeOptions));
-
-                        setRange(range, rangeOptions);
                     }
                 }
             }
@@ -81,25 +69,76 @@ module.exports = {
 
             await context.sync();
         });
-    },
-    clearData: async function () {
-    
-        await objExcel.run(async (context) => {
-
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            var range = sheet.getRange();
-
-            range.clear();
-
-            sheet.getRange('A1').select();
-
-            range.format.useStandardWidth = true;
-            
-            await context.sync();
-        });
-    },
+    }
 };
+
+async function clearData(context, sheetName = null) {
+
+    var sheet = null;
+
+    if (sheetName)
+        sheet = context.workbook.worksheets.getItem(sheetName);
+    else
+        sheet = context.workbook.worksheets.getActiveWorksheet();
+
+    var range = sheet.getRange();
+
+    range.clear();
+
+    sheet.getRange('A1').select();
+
+    range.format.useStandardWidth = true;
+
+    await context.sync();
+}
+
+async function getSheet(context, sheetName = null) {
+    
+    var sheet = null;
+
+    if (sheetName) {
+console.log(sheetName);
+        sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
+
+        sheet.load("isNullObject");
+
+        await context.sync();
+
+        if (sheet.isNullObject) {
+console.log("1");
+            sheet = context.workbook.worksheets.getActiveWorksheet();
+
+            var range = sheet.getUsedRangeOrNullObject(true);
+
+            range.load("isNullObject");
+
+            await context.sync();
+
+            if (range.isNullObject) {
+console.log("2");
+                sheet.name = sheetName;
+
+                await context.sync();
+            }
+            else {
+console.log("3");
+                sheet = context.workbook.worksheets.add(sheetName);
+            }
+        }
+        else {
+
+            await clearData(context, sheetName);
+        }
+    }
+    else {
+console.log("4");
+        sheet = context.workbook.worksheets.getActiveWorksheet();
+
+        await clearData(context);
+    }
+
+    return sheet;
+}
 
 function getRangeString(options) {
 
@@ -111,36 +150,35 @@ function getRangeString(options) {
 
 function setRange(range, options) {
 
-    if (options.formula) {
+    var formulas = [];
+    var numberFormats = [];
 
-        var formulas = [];
+    for (var i = 0; i < range.rowCount; i++) {
+
+        var formula = [];
+        var numberFormat = [];
     
-        for (var i = 0; i < options.rows; i++) {
-    
-            if (options.cells) {
+        for (var j = 0; j < range.columnCount; j++) {
 
-                formulas.push(['=' + options.formula]);
-            }
-            else {
+            if (options.formula) {
 
-                formulas.push(['=' + options.formula.replaceAll('?', (i + options.firstRow))]);
+                options.formula = options.formula.replaceAll('?', (i + range.rowIndex + 1));
+
+                formula.push('=' + options.formula);
             }
+
+            if (options.numberFormat) {
+
+                numberFormat.push(options.numberFormat);
+            }
+
+            if (formula.length) formulas.push(formula);
+            if (numberFormat.length) numberFormats.push(numberFormat);
         }
-
-        range.formulas = formulas;
     }
 
-    if (options.numberFormat) {
-
-        var numberFormats = [];
-    
-        for (var i = 0; i < options.rows; i++) {
-    
-            numberFormats.push([options.numberFormat]);
-        }
-
-        range.numberFormat = numberFormats;
-    }
+    if (formulas.length) range.formulas = formulas;
+    if (numberFormats.length) range.numberFormat = numberFormats;
 
     if (options.color) {
         
