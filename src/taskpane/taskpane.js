@@ -306,6 +306,10 @@ async function addSummary(data) {
             range: ['D2:D7','F2:F7'],
             numberFormat: '#,###.00%'
         },
+        {
+            range: ['B4:C4','F1:G1'],
+            horizontalAlignment: 'right'
+        },
 /*        {
             range: ['A1:D7'],
             color: COLOR_HEADER
@@ -319,7 +323,7 @@ async function addSummary(data) {
     // Set currency format
 
     var rngCurrencyFormat = {
-        range: ['B5:C7'],//,'G2:G7'
+        range: ['B5:C7','G2:G7'],
         numberFormat: '$#,###.00'
     };
 

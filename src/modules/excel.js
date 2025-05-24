@@ -138,7 +138,7 @@ function setRange(range, options) {
 
         var formula = [];
         var numberFormat = [];
-    
+
         for (var j = 0; j < range.columnCount; j++) {
 
             if (options.formula) {
@@ -167,6 +167,11 @@ function setRange(range, options) {
             range.format.fill.clear();
         else
             range.format.fill.color = options.color;
+    }
+
+    if (options.horizontalAlignment) {
+
+        range.format.horizontalAlignment = options.horizontalAlignment;
     }
 
     if (options.bold) range.format.font.bold = true;
