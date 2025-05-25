@@ -307,45 +307,84 @@ async function addSummary(data) {
             numberFormat: '#,###.00%'
         },
         {
-            range: ['B4:C4','F1:G1'],
+            range: ['B4:C4','F1:G1','C10:D10','C' + (rowItemsFirst - 1) + ':F' + (rowItemsFirst - 1)],
             horizontalAlignment: 'right'
         },
-/*        {
-            range: ['A1:D7'],
-            color: COLOR_HEADER
+        {
+            range: ['A10:A' + rowLaborLast,'A' + (rowItemsFirst - 1) + ':A' + rowItemsLast],
+            horizontalAlignment: 'center'
         },
-*/        {
+        {
             range: ['D2','A' + rowItemsFirst + ':A' + rowItemsLast,'B' + rowItemsFirst + ':B' + rowItemsLast],
             color: COLOR_INPUT
         }
     ];
 
-    // Set currency format
-
     var rngCurrencyFormat = {
-        range: ['B5:C7','G2:G7'],
+        range: ['B5:C7','G2:G7','C' + rowItemsFirst + ':F' + rowItemsLast],
         numberFormat: '$#,###.00'
     };
+
+    var rngBoldFormat = {
+        range: ['A1:D7','F1:G1','A9:D10','A' + (rowItemsFirst - 2) + ':F' + (rowItemsFirst - 1),'A' + rowItemsTotal + ':F' + rowItemsTotal],
+        bold: true
+    };
+
+    // Set labor format
 
     if (rowLaborFirst) {
         
         rngCurrencyFormat.range.push('C' + rowLaborFirst + ':D' + rowLaborLast);
         rngCurrencyFormat.range.push('D' + rowLaborTotal);
+        
+        rngBoldFormat.range.push('A' + (rowLaborFirst - 2) + ':D' + (rowLaborFirst - 1),'A' + rowLaborTotal + ':D' + rowLaborTotal);
+        rngBoldFormat.range.push('A' + rowLaborTotal + ':D' + rowLaborTotal);
     }
 
-    rngCurrencyFormat.range.push('C' + rowItemsFirst + ':F' + rowItemsLast);
-
     ranges.push(rngCurrencyFormat);
+    ranges.push(rngBoldFormat);
 
     // Set labor formulas
 
     var rngFormula = [];
-/*
-    for (var i = 0; i < data.labor.length; i++) {
 
-        ranges.push
+    var rowSum = 0;
+
+    for (var i = rowLaborFirst; i < rowLaborLast; i++) {
+
+        if (summaryArray[i -1][2] == '') {
+
+            if (rowSum != 0) {
+
+                rngFormula.push({
+                    range:['A' + rowSum],
+                    formula: ('SUM(A' + (rowSum + 1) + ':A' + (i - 1) + ')'),
+                    bold: true
+                });
+
+                rngFormula.push({
+                    range:['B' + rowSum],
+                    bold: true
+                });
+
+                rngFormula.push({
+                    range:['D' + rowSum],
+                    formula: ('SUM(D' + (rowSum + 1) + ':D' + (i - 1) + ')'),
+                    bold: true
+                });
+            }
+
+            rowSum = i;
+        }
+        else {
+
+            rngFormula.push({
+                range:['D' + i],
+                formula: 'A' + i + '*C' + i
+            });
+        }
     }
-*/
+
     await excel.addData("Summary", {
         data: summaryArray,
         ranges: ranges.concat(rngFormula)
@@ -502,7 +541,7 @@ function getSummaryArray(data) {
     }
 
     dataArray.push([LABEL_ITEMS,'','','','','','']);
-    dataArray.push(['Quantity','Description','Cost','Ext. Cost','Quote','Ext. Quote','']);
+    dataArray.push(['Qty.','Description','Cost','Ext. Cost','Quote','Ext. Quote','']);
 
     for (var i = 0; i < data.items.length; i++) {
     
