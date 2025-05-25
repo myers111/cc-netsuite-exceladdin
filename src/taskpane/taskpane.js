@@ -20,7 +20,8 @@ Office.onReady((info) => {
     if (info.host === Office.HostType.Excel) {
 
         excel.initialize({
-            excel: Excel
+            excel: Excel,
+            groupByRows: Excel.GroupOption.byRows
         });
 
         document.getElementById("reload").onclick = onReload;
@@ -344,9 +345,9 @@ async function addSummary(data) {
     ranges.push(rngCurrencyFormat);
     ranges.push(rngBoldFormat);
 
-    // Set labor formulas
+    // Set labor formulas & grouping
 
-    var rngFormula = [];
+    var rngLabor = [];
 
     var rowSum = 0;
 
@@ -354,40 +355,25 @@ async function addSummary(data) {
 
         if (summaryArray[i -1][2] == '') {
 
-            if (rowSum != 0) {
-
-                rngFormula.push({
-                    range:['A' + rowSum],
-                    formula: ('SUM(A' + (rowSum + 1) + ':A' + (i - 1) + ')'),
-                    bold: true
-                });
-
-                rngFormula.push({
-                    range:['B' + rowSum],
-                    bold: true
-                });
-
-                rngFormula.push({
-                    range:['D' + rowSum],
-                    formula: ('SUM(D' + (rowSum + 1) + ':D' + (i - 1) + ')'),
-                    bold: true
-                });
-            }
+            if (rowSum != 0) setLaborRanges(rngLabor, rowSum, i);
 
             rowSum = i;
         }
         else {
 
-            rngFormula.push({
+            rngLabor.push({
                 range:['D' + i],
                 formula: 'A' + i + '*C' + i
             });
         }
+
     }
+
+    if (rowSum != 0) setLaborRanges(rngLabor, rowSum, rowLaborLast + 1);
 
     await excel.addData("Summary", {
         data: summaryArray,
-        ranges: ranges.concat(rngFormula)
+        ranges: ranges.concat(rngLabor)
     });
 }
 
@@ -512,6 +498,31 @@ async function onBomLabor() {
      });
 }
 */
+function setLaborRanges(rngLabor, rowSum, i) {
+
+    rngLabor.push({
+        range:['A' + rowSum],
+        formula: ('SUM(A' + (rowSum + 1) + ':A' + (i - 1) + ')'),
+        bold: true
+    });
+
+    rngLabor.push({
+        range:['B' + rowSum],
+        bold: true
+    });
+
+    rngLabor.push({
+        range:['D' + rowSum],
+        formula: ('SUM(D' + (rowSum + 1) + ':D' + (i - 1) + ')'),
+        bold: true
+    });
+
+    rngLabor.push({
+        range:[(rowSum + 1) + ':' + (i - 1)],
+        groupByRows: true
+    });
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function getSummaryArray(data) {

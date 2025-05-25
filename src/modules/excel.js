@@ -1,11 +1,13 @@
 
 var objExcel = null;
+var objGroupbyRows = null;
 
 module.exports = {
 
     initialize: async function (options) {
 
         objExcel = options.excel;
+        objGroupbyRows = options.groupByRows;
 /*
         Excel.run(async (context) => {
 
@@ -118,6 +120,10 @@ async function getSheet(context, sheetName = null) {
         await clearData(context);
     }
 
+    //sheet.getRange().ungroup(objGroupbyRows);
+    
+    //await context.sync();
+
     return sheet;
 }
 
@@ -169,10 +175,7 @@ function setRange(range, options) {
             range.format.fill.color = options.color;
     }
 
-    if (options.horizontalAlignment) {
-
-        range.format.horizontalAlignment = options.horizontalAlignment;
-    }
-
+    if (options.horizontalAlignment) range.format.horizontalAlignment = options.horizontalAlignment;
     if (options.bold) range.format.font.bold = true;
+    if (options.groupByRows) range.group(Excel.GroupOption.byRows);
 }
