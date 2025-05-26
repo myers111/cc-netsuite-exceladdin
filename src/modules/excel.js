@@ -64,9 +64,15 @@ async function clearData(context, sheetName = null) {
     else
         sheet = context.workbook.worksheets.getActiveWorksheet();
 
-    var range = sheet.getRange();
+    var range = sheet.getRange('1:100000'); // getRange() is acceptable for everything but ungroup method
+
+    range.ungroup(Excel.GroupOption.byRows);
+
+    //var range = sheet.getRange();
 
     range.clear();
+
+    //await context.sync();
 
     sheet.getRange('A1').select();
 
@@ -119,10 +125,6 @@ async function getSheet(context, sheetName = null) {
 
         await clearData(context);
     }
-
-    //sheet.getRange().ungroup(objGroupbyRows);
-    
-    //await context.sync();
 
     return sheet;
 }
