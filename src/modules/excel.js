@@ -8,12 +8,7 @@ module.exports = {
 
         objExcel = options.excel;
         objGroupbyRows = options.groupByRows;
-/*
-        Excel.run(async (context) => {
-
-            await getSheet(context, "Summary");
-        });
-*/    },
+    },
     addData: async function (sheetName, options) {
     
         await objExcel.run(async (context) => {

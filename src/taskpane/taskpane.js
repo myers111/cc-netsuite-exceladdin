@@ -12,6 +12,7 @@ const NEW_ITEM = 3757;
 const COLOR_INPUT = '#C6E0B4';
 const LABEL_LABOR = 'Labor';
 const LABEL_ITEMS = 'Items';
+const LABEL_EXPENSES = 'Expenses';
 
 /* global console, document, Excel, Office */
 
@@ -141,11 +142,7 @@ async function onRevision() {
 
     var data = await api.get(params);
 
-    await addSummary({
-        defaultMU: data.defaultMU,
-        labor: (data.boms.length ? data.boms[0].labor : []),
-        items: data.items
-    });
+    await addSummary(data);
 
     for (var i = 0; i < data.boms.length; i++) {
 
@@ -154,6 +151,8 @@ async function onRevision() {
             bom: data.boms[i]
         });
     }
+
+    //await setLinkedFormulas();
 }
 
 async function addSummary(data) {
@@ -194,6 +193,8 @@ async function addSummary(data) {
 
     var rowLaborTotal = (rowLaborLast ? rowLaborLast + 1 : 0);
     var rowItemsTotal = rowItemsLast + 1;
+
+    // Set ranges
 
     var ranges = [
         {
@@ -318,105 +319,82 @@ async function addSummary(data) {
         {
             range: ['D2','A' + rowItemsFirst + ':A' + rowItemsLast,'B' + rowItemsFirst + ':B' + rowItemsLast],
             color: COLOR_INPUT
+        },
+        {
+            range: ['B5:C7','G2:G7','C' + rowItemsFirst + ':F' + rowItemsLast],
+            numberFormat: '$#,###.00'
+        },
+        {
+            range: ['A1:D7','F1:G1','A9:D10','A' + (rowItemsFirst - 2) + ':F' + (rowItemsFirst - 1),'A' + rowItemsTotal + ':F' + rowItemsTotal],
+            bold: true
         }
     ];
 
-    var rngCurrencyFormat = {
-        range: ['B5:C7','G2:G7','C' + rowItemsFirst + ':F' + rowItemsLast],
-        numberFormat: '$#,###.00'
-    };
-
-    var rngBoldFormat = {
-        range: ['A1:D7','F1:G1','A9:D10','A' + (rowItemsFirst - 2) + ':F' + (rowItemsFirst - 1),'A' + rowItemsTotal + ':F' + rowItemsTotal],
-        bold: true
-    };
-
-    // Set labor format
-
-    if (rowLaborFirst) {
-        
-        rngCurrencyFormat.range.push('C' + rowLaborFirst + ':D' + rowLaborLast);
-        rngCurrencyFormat.range.push('D' + rowLaborTotal);
-        
-        rngBoldFormat.range.push('A' + (rowLaborFirst - 2) + ':D' + (rowLaborFirst - 1),'A' + rowLaborTotal + ':D' + rowLaborTotal);
-        rngBoldFormat.range.push('A' + rowLaborTotal + ':D' + rowLaborTotal);
-    }
-
-    ranges.push(rngCurrencyFormat);
-    ranges.push(rngBoldFormat);
-
-    // Set labor formulas & grouping
-
-    var rngLabor = [];
-
-    var rowSum = 0;
-
-    for (var i = rowLaborFirst; i < rowLaborLast; i++) {
-
-        if (summaryArray[i -1][2] == '') {
-
-            if (rowSum != 0) setLaborRanges(rngLabor, rowSum, i);
-
-            rowSum = i;
-        }
-        else {
-
-            rngLabor.push({
-                range:['D' + i],
-                formula: 'A' + i + '*C' + i
-            });
-        }
-
-    }
-
-    if (rowSum != 0) setLaborRanges(rngLabor, rowSum, rowLaborLast + 1);
-
     await excel.addData("Summary", {
         data: summaryArray,
-        ranges: ranges.concat(rngLabor)
+        ranges: ranges.concat(getLaborRanges(summaryArray, rowLaborFirst, rowLaborLast, rowLaborTotal))
     });
 }
 
 async function addBom(data) {
 
+    var bomArray = getBomArray(data);
+
+    // Set first & last items row (starts at 1)
+    
+    var rowItemsFirst = bomArray.findIndex(el => el[0] == LABEL_ITEMS) + 2;
+    var rowItemsLast = bomArray.findIndex(el => el[0] == LABEL_LABOR);
+
+    // Set first & last labor row (starts at 1)
+    
+    var rowLaborFirst = rowItemsLast + 2;
+    var rowLaborLast = bomArray.findIndex(el => el[0] == 'Expenses');
+
+    // Set first & last expense row (starts at 1)
+    
+    var rowExpensesFirst = rowLaborLast + 2;
+    var rowExpensesLast = bomArray.length - 1;
+
+    var ranges = [
+        {
+            range: ['F' + rowItemsFirst + ':F' + rowItemsLast],
+            formula: 'C?*E?'
+        },
+        {
+            range: ['L' + rowItemsFirst + ':L' + rowItemsLast],
+            formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
+        },
+        {
+            range: ['F' + rowExpensesFirst + ':F' + rowExpensesLast],
+            formula: 'C?*E?'
+        },
+        {
+            range: ['L' + rowExpensesFirst + ':L' + rowExpensesLast],
+            formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
+        },
+        {
+            range: ['E:F','L:L'],
+            numberFormat: '$#,###.00'
+        },
+        {
+            range: ['J:J'],
+            numberFormat: '#,###.00%'
+        },
+        {
+            range: [
+                'A1:L2',
+                'A' + (rowLaborFirst - 1) + ':L' + (rowLaborFirst - 1),
+                'A' + (rowLaborLast + 1) + ':L' + (rowLaborLast + 1),
+                'A' + bomArray.length + ':L' + bomArray.length
+            ],
+            bold: true
+        }
+    ];
+
     await excel.addData(data.bom.name, {
-        data: getBomArray(data.bom),
-/*        ranges: [
-            {
-                firstRow: 3,
-                rows: data.items.length,
-                columns: ['F'],
-                formula: 'C?*E?'
-            },
-            {
-                firstRow: 3,
-                rows: data.items.length,
-                columns: ['L'],
-                formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
-            },
-            {
-                firstRow: 3,
-                rows: data.items.length,
-                columns: ['E','F','J'],
-                numberFormat: '0.00'
-            },
-            {
-                firstRow: 3,
-                rows: data.items.length,
-                columns: ['C'],
-                numberFormat: '0'
-            },
-            {
-                color: 'lightgrey'
-            },
-            {
-                firstRow: 3,
-                rows: data.items.length,
-                columns: ['A','B','C','E','J'],
-                color: 'white'
-            }
-        ]
-*/    });
+        data: bomArray,
+        ranges: ranges//.concat(getLaborRanges(bomArray, rowLaborFirst, rowLaborLast))
+    });
 }
 /*
 async function onBomExpenses() {
@@ -498,28 +476,47 @@ async function onBomLabor() {
      });
 }
 */
-function setLaborRanges(rngLabor, rowSum, i) {
+async function setLinkedFormulas() {
+    
+    Excel.run(async (context) => {
 
-    rngLabor.push({
-        range:['A' + rowSum],
-        formula: ('SUM(A' + (rowSum + 1) + ':A' + (i - 1) + ')'),
-        bold: true
-    });
+        var sheetCount = context.workbook.worksheets.getCount();
 
-    rngLabor.push({
-        range:['B' + rowSum],
-        bold: true
-    });
+        var sheets = context.workbook.worksheets;
+    
+        sheets.load("items/name");
 
-    rngLabor.push({
-        range:['D' + rowSum],
-        formula: ('SUM(D' + (rowSum + 1) + ':D' + (i - 1) + ')'),
-        bold: true
-    });
+        await context.sync();
 
-    rngLabor.push({
-        range:[(rowSum + 1) + ':' + (i - 1)],
-        groupByRows: true
+        sheets.items.forEach(function (sheet) {
+
+            if (sheet.name != 'Summary') {
+
+                var laborRange = sheet.getRange('A:A').find('Labor', {
+                    completeMatch: true, /* Match the whole cell value, not any part of the text. */
+                    matchCase: false /* Make the search case-insensitive. */,
+                });
+
+                var expRange = sheet.getRange('A:A').find('Expenses', {
+                    completeMatch: true, /* Match the whole cell value, not any part of the text. */
+                    matchCase: false /* Make the search case-insensitive. */,
+                });
+
+                laborRange.load('rowIndex');
+                expRange.load('rowIndex');
+                
+                context.sync();
+
+                var range = sheet.getRange('A' + (laborRange.rowIndex + 2) + ':D' + expRange.rowIndex);
+
+                range.load('values');
+
+                for (var i = 0; i < range.values.length; i++) {
+
+
+                }
+            }
+        });
     });
 }
 
@@ -527,11 +524,11 @@ function setLaborRanges(rngLabor, rowSum, i) {
 
 function getSummaryArray(data) {
 
-    var labor = getLaborArray(data.labor, true);
+    var laborArray = getLaborArray(data.boms);
 
     var dataArray = [
         ['Quote','','',0,'','GM','Sell'],
-        ['MU (Default)','','',data.defaultMU,'',0,0],
+        ['MU (Default)','','',(data.defaultMU / 100),'',0,0],
         ['GM','','',0,'',0,0],
         ['MU','Cost','Sell',0,'',0,0],
         [LABEL_LABOR,0,0,0,'',0,0],
@@ -540,12 +537,15 @@ function getSummaryArray(data) {
         ['','','','','','',''],
     ];
 
-    if (labor.length) {
+    if (laborArray.length) {
 
         dataArray.push([LABEL_LABOR,'','','','','','']);
         dataArray.push(['Qty.','','Cost','Ext. Cost','','','']);
 
-        dataArray = dataArray.concat(labor);
+        for (var i = 0; i < laborArray.length; i++) {
+
+            dataArray.push(laborArray[i].concat(['','','','']));
+        }
 
         dataArray.push(['Total','','',0,'','','']);
         dataArray.push(['','','','','','','']);
@@ -576,14 +576,16 @@ function getSummaryArray(data) {
 
 function getBomArray(data) {
 
+    var laborArray = getLaborArray([data.bom]);
+
     var dataArray = [
         ['Item','Description','Quantity','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote'],
-        ['Items','','','','','','','','','','','']
+        [LABEL_ITEMS,'','','','','','','','','','','']
     ];
 
-    for (var i = 0; i < data.items.length; i++) {
+    for (var i = 0; i < data.bom.items.length; i++) {
     
-        var item = data.items[i];
+        var item = data.bom.items[i];
 
         var quantity = (item.quantity ? parseInt(item.quantity) : 0);
         var price = (item.price ? parseFloat(item.price) : 0);
@@ -606,17 +608,18 @@ function getBomArray(data) {
         ]);
     }
 
-    dataArray.push(['Labor','','','','','','','','','','','']);
+    dataArray.push([LABEL_LABOR,'','','','','','','','','','','']);
 
-    var labor = getLaborArray(data.labor);
+    for (var i = 0; i < laborArray.length; i++) {
 
-    if (labor.length) dataArray = dataArray.concat(labor);
+        dataArray.push(laborArray[i].concat(['','','','','','','','','']));
+    }
 
-    dataArray.push(['Expenses','','','','','','','','','','','']);
+    dataArray.push([LABEL_EXPENSES,'','','','','','','','','','','']);
 
-    for (var i = 0; i < data.expenses.length; i++) {
+    for (var i = 0; i < data.bom.expenses.length; i++) {
     
-        var expense = data.expenses[i];
+        var expense = data.bom.expenses[i];
 
         var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
         var price = (expense.price ? parseFloat(expense.price) : 0);
@@ -637,40 +640,140 @@ function getBomArray(data) {
             (expense.discount == 'T' ? 'Yes' : 'No'),
             (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
         ]);   
-
-        dataArray.push(['Total','','','','',0,'','','','','',0]);
     }
+
+    dataArray.push(['Total','','','','',0,'','','','','',0]);
 
     return dataArray;
 }
 
-function getLaborArray(data, summary = false) {
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function getLaborArray(boms) {
+
+    var data = {};
+
+    for (var i = 0; i < boms.length; i++) {
+
+        var labor = boms[i].labor;
+
+        for (var j = 0; j < labor.length; j++) {
+
+            var l = labor[j];
+
+            if (!data[l.groupName]) data[l.groupName] = [];
+
+            var index = data[l.groupName].findIndex(obj => obj.id == l.id && obj.cost == l.cost);
+
+            if (index < 0) data[l.groupName].push(l);
+        }
+    }
 
     var laborArray = [];
 
-    var groupName = '';
+    for (const key in data) {
 
-    for (var i = 0; i < data.length; i++) {
-    
-        var labor = data[i];
+        if (!data.hasOwnProperty(key)) continue;
 
-        if (groupName != labor.groupName) {
+        laborArray.push([0,key,'']);
 
-            groupName = labor.groupName;
+        for (var i = 0; i < data[key].length; i++) {
 
-            if (summary)
-                laborArray.push([0,labor.groupName,'',0,'','','']);
-            else
-                laborArray.push(['',labor.groupName,0,'',0,'','','','',0,0,0]);
+            var labor = data[key][i];
+
+            laborArray.push([labor.quantity,labor.name,labor.cost]);
         }
-
-        if (summary)
-            laborArray.push([labor.quantity,labor.name,labor.cost,0,'','','']);
-        else
-            laborArray.push(['',labor.name,labor.quantity,'',0,0,'','','',0,0,0]);
     }
 
     return laborArray;
+}
+
+function getLaborRanges(dataArray, rowLaborFirst, rowLaborLast, rowLaborTotal = 0) {
+
+    var ranges = [];
+
+    var rngCurrencyFormat = {
+        range: ['C' + rowLaborFirst + ':D' + rowLaborLast],
+        numberFormat: '$#,###.00'
+    };
+
+    var rngBoldFormat = {
+        range: ['A' + (rowLaborFirst - (rowLaborTotal ? 2 : 1)) + ':D' + (rowLaborFirst - 1)],
+        bold: true
+    };
+
+    if (rowLaborTotal) {
+        
+        rngCurrencyFormat.range.push('D' + rowLaborTotal);
+        
+        rngBoldFormat.range.push('A' + rowLaborTotal + ':D' + rowLaborTotal);
+    }
+
+    ranges.push(rngCurrencyFormat);
+    ranges.push(rngBoldFormat);
+
+    // Set labor formulas & grouping
+
+    var rngLabor = [];
+
+    var rowSum = 0;
+    var laborTotalFormula = '';
+
+    for (var i = rowLaborFirst; i < rowLaborLast; i++) {
+
+        if (dataArray[i -1][2] == '') {
+
+            if (rowSum != 0) setLaborRanges(rngLabor, rowSum, i);
+
+            rowSum = i;
+
+            if (laborTotalFormula.length) laborTotalFormula += '+';
+
+            laborTotalFormula += ('D' + i);
+        }
+        else {
+
+            rngLabor.push({
+                range: ['D' + i],
+                formula: 'A' + i + '*C' + i
+            });
+        }
+
+    }
+
+    rngLabor.push({
+        range: ['D' + rowLaborTotal],
+        formula: laborTotalFormula
+    });
+
+    if (rowSum != 0) setLaborRanges(rngLabor, rowSum, rowLaborLast + 1);
+
+    return ranges.concat(rngLabor);
+}
+
+function setLaborRanges(rngLabor, rowSum, i) {
+
+    rngLabor.push({
+        range:['A' + rowSum],
+        formula: ('SUM(A' + (rowSum + 1) + ':A' + (i - 1) + ')'),
+        bold: true
+    });
+
+    rngLabor.push({
+        range:['B' + rowSum],
+        bold: true
+    });
+
+    rngLabor.push({
+        range:['D' + rowSum],
+        formula: ('SUM(D' + (rowSum + 1) + ':D' + (i - 1) + ')'),
+        bold: true
+    });
+
+    rngLabor.push({
+        range:[(rowSum + 1) + ':' + (i - 1)],
+        groupByRows: true
+    });
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
