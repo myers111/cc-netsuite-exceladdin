@@ -63,11 +63,11 @@ async function clearData(context, sheetName = null) {
 
     range.ungroup(Excel.GroupOption.byRows);
 
-    //var range = sheet.getRange();
+    var range = sheet.getRange('A:Z'); // getRange() is acceptable for everything but ungroup method
+
+    range.ungroup(Excel.GroupOption.byColumns);
 
     range.clear();
-
-    //await context.sync();
 
     sheet.getRange('A1').select();
 
@@ -175,4 +175,5 @@ function setRange(range, options) {
     if (options.horizontalAlignment) range.format.horizontalAlignment = options.horizontalAlignment;
     if (options.bold) range.format.font.bold = true;
     if (options.groupByRows) range.group(Excel.GroupOption.byRows);
+    if (options.groupByColumns) range.group(Excel.GroupOption.byColumns);
 }
