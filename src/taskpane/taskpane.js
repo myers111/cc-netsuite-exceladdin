@@ -272,13 +272,35 @@ async function addBom(data) {
     ];
 
     var dataRanges = [];
-/*
+
+    // Items
+
     var itemData = getItemData({
         defaultMU: data.defaultMU,
         items: data.bom.items,
         rowFirst: dataArray.length + 1,
         isSummary: false
     });
+
+    itemData.values[0] = itemData.values[0].concat(['','','','','','']);
+
+    for (var i = 0; i < data.bom.items.length; i++) {
+    
+        var item = data.bom.items[i];
+
+        var markup = (item.markup ? parseFloat(item.markup) : 0);
+
+        var index = i + 1;
+
+        itemData.values[index] = itemData.values[index].concat([
+            item.units,
+            (item.vendorId ? item.vendor : item.newVendor),
+            item.manufacturer,
+            item.mpn,
+            (markup > 0 ? markup : ''),
+            (item.discount == 'T' ? 'Yes' : 'No')
+        ]);
+    }
 
     itemData.ranges = itemData.ranges.concat([
         {
@@ -290,6 +312,8 @@ async function addBom(data) {
     dataArray = dataArray.concat(itemData.values);
     dataRanges = dataRanges.concat(itemData.ranges);
 
+    // Labor
+
     var laborData = getLaborData({
         defaultMU: data.defaultMU,
         boms: [data.bom],
@@ -297,68 +321,51 @@ async function addBom(data) {
         isSummary: false
     });
 
+    for (var i = 0; i < laborData.values.length; i++) {
+    
+        laborData.values[i] = laborData.values[i].concat(['','','','','','']);
+    }
+
     dataArray = dataArray.concat(laborData.values);
     dataRanges = dataRanges.concat(laborData.ranges);
 
-    dataArray.push(['Total','','','',0,'',0]);
-*/
+    // Expenses
+    
+    var expenseData = getExpenseData({
+        defaultMU: data.defaultMU,
+        expenses: data.bom.expenses,
+        rowFirst: dataArray.length + 1,
+        isSummary: false
+    });
+
+    dataArray = dataArray.concat(expenseData.values);
+    dataRanges = dataRanges.concat(expenseData.ranges);
+
+    // Totals
+
+    dataArray.push(['Total','','','',0,'',0,'','','','','','']);
+
     dataRanges = dataRanges.concat([
-/*        {
-            range: ['A1:G1','A' + dataArray.length + ':G' + dataArray.length],
+        {
+            range: ['A1:M1','A' + dataArray.length + ':M' + dataArray.length],
             bold: true
         },
         {
             range: ['E' + dataArray.length],
-            formula: 'SUM(E' + itemData.rowFirst + ':E' + itemData.rowLast + ')+SUMIFS(E' + laborData.rowFirst + ':E' + laborData.rowLast + ',D' + laborData.rowFirst + ':D' + laborData.rowLast + ',"<>")',
+            formula: 'SUM(E' + itemData.rowFirst + ':E' + itemData.rowLast + ')+SUMIFS(E' + laborData.rowFirst + ':E' + laborData.rowLast + ',D' + laborData.rowFirst + ':D' + laborData.rowLast + ',"<>")+SUM(E' + expenseData.rowFirst + ':E' + expenseData.rowLast + ')',
             numberFormat: '$#,###.00'
         },
         {
             range: ['G' + dataArray.length],
-            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")',
+            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")+SUM(F' + expenseData.rowFirst + ':F' + expenseData.rowLast + ')',
             numberFormat: '$#,###.00'
-        }
-*/        {
+        },
+        {
             range:['H:M'],
             groupByColumns: true
         }
     ]);
-/*
-    var ranges = [
-        {
-            range: ['F' + rowItemsFirst + ':F' + rowItemsLast],
-            formula: 'C?*E?'
-        },
-        {
-            range: ['L' + rowItemsFirst + ':L' + rowItemsLast],
-            formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
-        },
-        {
-            range: ['F' + rowExpensesFirst + ':F' + rowExpensesLast],
-            formula: 'C?*E?'
-        },
-        {
-            range: ['L' + rowExpensesFirst + ':L' + rowExpensesLast],
-            formula: 'ROUND(F?*(1+IF(K?="Yes",-1,1)*IF(ISNUMBER(J?),J?,' + data.defaultMU + ')/100),0)'
-        },
-        {
-            range: ['E:F','L:L'],
-            numberFormat: '$#,###.00'
-        },
-        {
-            range: ['J:J'],
-            numberFormat: '#,###.00%'
-        },
-        {
-            range: [
-                'A1:L2',
-                'A' + (rowLaborFirst - 1) + ':L' + (rowLaborFirst - 1),
-                'A' + (rowLaborLast + 1) + ':L' + (rowLaborLast + 1),
-                'A' + bomArray.length + ':L' + bomArray.length
-            ],
-            bold: true
-        }
-    ];
-*/
+
     await excel.addData(data.bom.name, {
         data: dataArray,
         ranges: dataRanges
@@ -455,7 +462,7 @@ function getItemData(data) {
 
     itemData.ranges = itemData.ranges.concat([
         {
-            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'M' + itemData.rowFirst + ':M' + itemData.rowLast],
             horizontalAlignment: 'center'
         },
         {
@@ -467,14 +474,28 @@ function getItemData(data) {
             numberFormat: '$#,###.00'
         },
         {
+            range: ['L' + itemData.rowFirst + ':L' + itemData.rowLast],
+            numberFormat: '#,###.00%'
+        },
+        {
             range: ['E' + itemData.rowFirst + ':E' + itemData.rowLast],
             formula: 'A?*D?'
         },
         {
             range: ['G' + itemData.rowFirst + ':G' + itemData.rowLast],
             formula: 'A?*F?'
-        },
+        }
     ]);
+
+    if (!data.isSummary) {
+        
+        itemData.ranges = itemData.ranges.concat([
+            {
+                range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
+                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,' + data.defaultMU + ')/100),0)'
+            }
+        ]);
+    }
 
     return itemData;
 }
@@ -570,6 +591,11 @@ function getLaborData(data) {
                     range: ['A' + i,'D' + i],
                     color: COLOR_INPUT
                 });
+
+                rngLaborGroup.push({
+                    range: ['F' + i],
+                    formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,' + data.defaultMU + ')/100),0)'
+                });
             }
 
             rngLaborGroup.push({
@@ -623,77 +649,94 @@ function setLaborGroupRanges(rngLabor, rowSum, i) {
     });
 }
 
-function getBomArray(data) {
+function getExpenseData(data) {
 
-    var laborArray = getLaborArray([data.bom]);
-
-    var dataArray = [
-        ['Item','Description','Quantity','Units','Price','Amount','Vendor','Manufacturer','MPN','MU%','Discount','Quote'],
-        [LABEL_ITEMS,'','','','','','','','','','','']
-    ];
-
-    for (var i = 0; i < data.bom.items.length; i++) {
+    /* data = { defaultMU, rowFirst, expenses } *******************************************************************************************************************/
     
-        var item = data.bom.items[i];
+    var expenseData = {
+        values: [
+            [LABEL_EXPENSES,'','','','','','','','','','','','']
+        ],
+        ranges: [
+            {
+                range: ['A' + data.rowFirst],
+                bold: true
+            }
+        ],
+        rowFirst: data.rowFirst + 1,
+        rowLast: 0
+    };
 
-        var quantity = (item.quantity ? parseInt(item.quantity) : 0);
-        var price = (item.price ? parseFloat(item.price) : 0);
-        var markup = (item.markup ? parseFloat(item.markup) : 0);
-        var defaultMU = (data.defaultMU ? parseFloat(data.defaultMU) : 0);
+    // Set values
 
-        dataArray.push([
-            (item.itemId == NEW_ITEM ? item.newItem : item.name),
-            (item.itemId == NEW_ITEM ? item.newDescription : item.description),
-            quantity,
-            item.units,
-            price,
-            (quantity * price),
-            (item.vendorId ? item.vendor : item.newVendor),
-            item.manufacturer,
-            item.mpn,
-            (markup > 0 ? markup : ''),
-            (item.discount == 'T' ? 'Yes' : 'No'),
-            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
-        ]);
-    }
-
-    dataArray.push([LABEL_LABOR,'','','','','','','','','','','']);
-
-    for (var i = 0; i < laborArray.length; i++) {
-
-        dataArray.push(laborArray[i].concat(['','','','','','','','','']));
-    }
-
-    dataArray.push([LABEL_EXPENSES,'','','','','','','','','','','']);
-
-    for (var i = 0; i < data.bom.expenses.length; i++) {
+    for (var i = 0; i < data.expenses.length; i++) {
     
-        var expense = data.bom.expenses[i];
+        var expense = data.expenses[i];
 
         var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
         var price = (expense.price ? parseFloat(expense.price) : 0);
         var markup = (expense.markup ? parseFloat(expense.markup) : 0);
         var defaultMU = (data.defaultMU ? parseFloat(data.defaultMU) : 0);
 
-        dataArray.push([
-            '',
-            expense.name,
+        expenseData.values.push([
             quantity,
             '',
+            expense.name,
             price,
-            (quantity * price),
+            0,
+            0,
+            0,
+            '',
             '',
             '',
             '',
             (markup > 0 ? markup : ''),
-            (expense.discount == 'T' ? 'Yes' : 'No'),
-            (quantity * price * (1 + (markup > 0 ? markup : defaultMU)))
+            (expense.discount == 'T' ? 'Yes' : 'No')
         ]);   
     }
 
-    dataArray.push(['Total','','','','',0,'','','','','',0]);
+    expenseData.rowLast = expenseData.rowFirst + expenseData.values.length - 2;
 
-    return dataArray;
+    // Set ranges
+
+    expenseData.ranges = expenseData.ranges.concat([
+        {
+            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'M' + expenseData.rowFirst + ':M' + expenseData.rowLast],
+            horizontalAlignment: 'center'
+        },
+        {
+            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'D' + expenseData.rowFirst + ':D' + expenseData.rowLast],
+            color: COLOR_INPUT
+        },
+        {
+            range: ['D' + expenseData.rowFirst + ':G' + expenseData.rowLast],
+            numberFormat: '$#,###.00'
+        },
+        {
+            range: ['L' + expenseData.rowFirst + ':L' + expenseData.rowLast],
+            numberFormat: '#,###.00%'
+        },
+        {
+            range: ['E' + expenseData.rowFirst + ':E' + expenseData.rowLast],
+            formula: 'A?*D?'
+        },
+        {
+            range: ['G' + expenseData.rowFirst + ':G' + expenseData.rowLast],
+            formula: 'A?*F?'
+        }
+    ]);
+
+    if (!data.isSummary) {
+        
+        expenseData.ranges = expenseData.ranges.concat([
+            {
+                range: ['F' + expenseData.rowFirst + ':F' + expenseData.rowLast],
+                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,' + data.defaultMU + ')/100),0)'
+            }
+        ]);
+    }
+
+    return expenseData;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
