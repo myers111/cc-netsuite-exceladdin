@@ -3,7 +3,7 @@
  * See LICENSE in the project root for license information.
  */
 
-const { getgid } = require('process');
+const { getgid, exit } = require('process');
 const api = require('../modules/api.js');
 const excel = require('../modules/excel.js');
 
@@ -146,15 +146,19 @@ async function onRevision() {
 
     await addSummary(data);
 
+    const promises = [];
+
     for (var i = 0; i < data.boms.length; i++) {
 
-        await addBom({
+        promises.push(addBom({
             defaultMU: data.defaultMU,
             bom: data.boms[i]
-        });
+        }));
     }
 
-    //await setLinkedFormulas();
+    await Promise.all(promises);
+
+    //await setLinkedValues();
 }
 
 async function addSummary(data) {
@@ -372,11 +376,13 @@ async function addBom(data) {
     });
 }
 
-async function setLinkedFormulas() {
-    
+async function setLinkedValues() {
+
     Excel.run(async (context) => {
 
-        var sheetCount = context.workbook.worksheets.getCount();
+        // Get BOM values
+
+        var linkedValues = {};
 
         var sheets = context.workbook.worksheets;
     
@@ -384,35 +390,86 @@ async function setLinkedFormulas() {
 
         await context.sync();
 
-        sheets.items.forEach(function (sheet) {
+        sheets.items.forEach(async function (sheet) {
 
             if (sheet.name != 'Summary') {
 
-                var laborRange = sheet.getRange('A:A').find('Labor', {
-                    completeMatch: true, /* Match the whole cell value, not any part of the text. */
-                    matchCase: false /* Make the search case-insensitive. */,
-                });
-
-                var expRange = sheet.getRange('A:A').find('Expenses', {
-                    completeMatch: true, /* Match the whole cell value, not any part of the text. */
-                    matchCase: false /* Make the search case-insensitive. */,
-                });
-
-                laborRange.load('rowIndex');
-                expRange.load('rowIndex');
-                
-                context.sync();
-
-                var range = sheet.getRange('A' + (laborRange.rowIndex + 2) + ':D' + expRange.rowIndex);
+                var range = sheet.getRange();
 
                 range.load('values');
+                
+                await context.sync();
 
-                for (var i = 0; i < range.values.length; i++) {
+                if (range.values.length && range.values[0][0] == 'Quantity') {
+/*
+                    var values = {
+                        labor: {},
+                        cost: range.values[range.values.length - 1][4],
+                        quote: range.values[range.values.length - 1][6]
+                    }; 
+*//*
+                    var labor = false;
 
+                    for (var i = 0; i < range.values.length; i++) {
 
+                        var v = range.values[i];
+
+                        if (labor) {
+
+                            if (v[0] == LABEL_EXPENSES) exit;
+
+                            if (v[3] != '') {
+                                
+                                values.labor[v[1]][v[2]] = {
+                                    qty: v[0],
+                                    cost: v[3]
+                                }
+                            }
+                        }
+                        else if (v[0] == LABEL_LABOR) {
+                            
+                            labor = true;
+                        }
+                    }
+*/
+                    //linkedValues[sheet.name] = values;
                 }
             }
         });
+return;
+        // Set Summary formulas
+
+        var sheet = context.workbook.worksheets.getItem('Summary');
+
+        var itemsRange = sheet.getRange('A:A').find(LABEL_ITEMS, {
+            completeMatch: true, /* Match the whole cell value, not any part of the text. */
+            matchCase: false /* Make the search case-insensitive. */,
+            searchDirection: Excel.SearchDirection.forward
+        });
+
+        var laborRange = sheet.getRange('A:A').find(LABEL_LABOR, {
+            completeMatch: true, /* Match the whole cell value, not any part of the text. */
+            matchCase: false /* Make the search case-insensitive. */,
+            searchDirection: Excel.SearchDirection.forward,
+            after: itemsRange
+        });
+
+        var expRange = sheet.getRange('A:A').find(LABEL_EXPENSES, {
+            completeMatch: true, /* Match the whole cell value, not any part of the text. */
+            matchCase: false /* Make the search case-insensitive. */,
+            searchDirection: Excel.SearchDirection.forward,
+            after: laborRange
+        });
+
+        itemsRange.load('rowIndex');
+        laborRange.load('rowIndex');
+        expRange.load('rowIndex');
+                
+        context.sync();
+return;
+        var range = sheet.getRange('A' + (laborRange.rowIndex + 2) + ':D' + expRange.rowIndex - 1);
+
+        range.load('values');
     });
 }
 
@@ -454,6 +511,14 @@ function getItemData(data) {
             0,
             0
         ]);
+
+        if (!item.isBom) {
+
+            itemData.ranges.push({
+                range: ['B' + (itemData.rowFirst + i),'D' + (itemData.rowFirst + i)],
+                color: COLOR_INPUT
+            });
+        }
     }
 
     itemData.rowLast = itemData.rowFirst + itemData.values.length - 2;
@@ -466,7 +531,7 @@ function getItemData(data) {
             horizontalAlignment: 'center'
         },
         {
-            range: ['A' + itemData.rowFirst + ':C' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'C' + itemData.rowFirst + ':C' + itemData.rowLast],
             color: COLOR_INPUT
         },
         {

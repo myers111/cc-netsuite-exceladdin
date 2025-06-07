@@ -1,3 +1,4 @@
+const { exit } = require("process");
 
 var objExcel = null;
 var objGroupbyRows = null;
@@ -30,11 +31,52 @@ module.exports = {
 
                     for (var j = 0; j < rangeOptions.range.length; j++) {
     
-                        var range = sheet.getRange(rangeOptions.range[j]).load(['rowIndex','rowCount','columnCount']);
+                        var range = sheet.getRange(rangeOptions.range[j]);
 
-                        await context.sync();
+                        var rangeProperties = getRangeProperties(rangeOptions.range[j]);
 
-                        setRange(range, rangeOptions);
+                        var formulas = [];
+                        var numberFormats = [];
+
+                        for (var r = 0; r < rangeProperties.rows; r++) {
+
+                            var formula = [];
+                            var numberFormat = [];
+
+                            for (var c = 0; c < rangeProperties.columns; c++) {
+
+                                if (rangeOptions.formula) {
+
+                                    rangeOptions.formula = rangeOptions.formula.replaceAll('?', (r + rangeProperties.firstRow));
+
+                                    formula.push('=' + rangeOptions.formula);
+                                }
+
+                                if (rangeOptions.numberFormat) {
+
+                                    numberFormat.push(rangeOptions.numberFormat);
+                                }
+                            }
+
+                            if (formula.length) formulas.push(formula);
+                            if (numberFormat.length) numberFormats.push(numberFormat);
+                        }
+
+                        if (formulas.length) range.formulas = formulas;
+                        if (numberFormats.length) range.numberFormat = numberFormats;
+
+                        if (rangeOptions.color) {
+                            
+                            if (rangeOptions.color == 'white')
+                                range.format.fill.clear();
+                            else
+                                range.format.fill.color = rangeOptions.color;
+                        }
+
+                        if (rangeOptions.horizontalAlignment) range.format.horizontalAlignment = rangeOptions.horizontalAlignment;
+                        if (rangeOptions.bold) range.format.font.bold = true;
+                        if (rangeOptions.groupByRows) range.group(Excel.GroupOption.byRows);
+                        if (rangeOptions.groupByColumns) range.group(Excel.GroupOption.byColumns);
                     }
                 }
             }
@@ -132,48 +174,49 @@ function getRangeString(options) {
     return (firstColumn + (options.rows ? firstRow : '') + ':' + String.fromCharCode(firstColumn.charCodeAt(0) + options.columns - 1) + (options.rows ? firstRow + options.rows - 1 : ''));
 }
 
-function setRange(range, options) {
+function getRangeProperties(rangeString) {
 
-    var formulas = [];
-    var numberFormats = [];
+    // Using this method is much faster then syncing to get the rowIndex, rowCount &columnCount properties
 
-    for (var i = 0; i < range.rowCount; i++) {
+    var ranges = rangeString.split(':');
 
-        var formula = [];
-        var numberFormat = [];
+    var cp1 = getCellProperties(ranges[0]);
 
-        for (var j = 0; j < range.columnCount; j++) {
+    var props = {
+        rows: 1,
+        columns: 1,
+        firstRow: (cp1.row ? cp1.row : 1)
+    };
 
-            if (options.formula) {
+    if (ranges.length == 1) return props;
 
-                options.formula = options.formula.replaceAll('?', (i + range.rowIndex + 1));
+    cp2 = getCellProperties(ranges[1]);
 
-                formula.push('=' + options.formula);
-            }
+    if (cp1.row && cp2.row) props.rows = cp2.row - cp1.row + 1;
+    if (cp1.column && cp2.column) props.columns = cp2.column - cp1.column + 1;
 
-            if (options.numberFormat) {
+    return props;
+}
 
-                numberFormat.push(options.numberFormat);
-            }
+function getCellProperties(rangeString) {
+
+    var props = {};
+
+    for (var i = 0; i < rangeString.length; i++) {
+
+        var code = rangeString.charCodeAt(i);
+
+        if (code >= 65 && code <= 90) { // column
+
+            props.column = (i * 26) + (code - 64);
         }
+        else { // row
 
-        if (formula.length) formulas.push(formula);
-        if (numberFormat.length) numberFormats.push(numberFormat);
+            props.row = parseInt(rangeString.substring(i));
+
+            break;
+        }
     }
 
-    if (formulas.length) range.formulas = formulas;
-    if (numberFormats.length) range.numberFormat = numberFormats;
-
-    if (options.color) {
-        
-        if (options.color == 'white')
-            range.format.fill.clear();
-        else
-            range.format.fill.color = options.color;
-    }
-
-    if (options.horizontalAlignment) range.format.horizontalAlignment = options.horizontalAlignment;
-    if (options.bold) range.format.font.bold = true;
-    if (options.groupByRows) range.group(Excel.GroupOption.byRows);
-    if (options.groupByColumns) range.group(Excel.GroupOption.byColumns);
+    return props;
 }
