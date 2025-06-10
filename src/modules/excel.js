@@ -163,6 +163,8 @@ async function getSheet(context, sheetName = null) {
         await clearData(context);
     }
 
+    if (sheetName == 'Summary') sheet.position = 0;
+
     return sheet;
 }
 

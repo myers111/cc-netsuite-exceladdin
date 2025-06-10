@@ -8,7 +8,6 @@ const api = require('../modules/api.js');
 const excel = require('../modules/excel.js');
 
 const NEW_ITEM = 3757;
-//const COLOR_HEADER = '#E7E6E6';
 const COLOR_INPUT = '#C6E0B4';
 const LABEL_HEADER = ['Quantity','Item','Description','Cost','Ext. Cost','Quote','Ext. Quote'];
 const LABEL_HEADER_EX = ['Units','Vendor','Manufacturer','MPN','MU%','Discount'];
@@ -17,6 +16,8 @@ const LABEL_ITEMS = 'Items';
 const LABEL_EXPENSES = 'Expenses';
 
 /* global console, document, Excel, Office */
+
+var summaryFormulas = null;
 
 Office.onReady((info) => {
 
@@ -134,6 +135,12 @@ async function onQuote() {
 
 async function onRevision() {
 
+    summaryFormulas = {
+        labor: {},
+        cost: {},
+        quote: {}
+    };
+
     var params = {
         path: 'revision',
         options: {
@@ -143,8 +150,6 @@ async function onRevision() {
     };
 
     var data = await api.get(params);
-
-    await addSummary(data);
 
     const promises = [];
 
@@ -158,7 +163,7 @@ async function onRevision() {
 
     await Promise.all(promises);
 
-    //await setLinkedValues();
+    await addSummary(data);
 }
 
 async function addSummary(data) {
@@ -181,16 +186,6 @@ async function addSummary(data) {
         }
     ];
 
-    var itemData = getItemData({
-        defaultMU: data.defaultMU,
-        items: data.items,
-        rowFirst: dataArray.length + 1,
-        isSummary: true
-    });
-
-    dataArray = dataArray.concat(itemData.values);
-    dataRanges = dataRanges.concat(itemData.ranges);
-
     var laborData = getLaborData({
         defaultMU: data.defaultMU,
         boms: data.boms,
@@ -200,6 +195,16 @@ async function addSummary(data) {
 
     dataArray = dataArray.concat(laborData.values);
     dataRanges = dataRanges.concat(laborData.ranges);
+
+    var itemData = getItemData({
+        defaultMU: data.defaultMU,
+        items: data.items,
+        rowFirst: dataArray.length + 1,
+        isSummary: true
+    });
+
+    dataArray = dataArray.concat(itemData.values);
+    dataRanges = dataRanges.concat(itemData.ranges);
 
     dataArray.push(['Total','','','',0,'',0]);
 
@@ -281,6 +286,7 @@ async function addBom(data) {
 
     var itemData = getItemData({
         defaultMU: data.defaultMU,
+        bomName: data.bom.name,
         items: data.bom.items,
         rowFirst: dataArray.length + 1,
         isSummary: false
@@ -349,6 +355,11 @@ async function addBom(data) {
 
     dataArray.push(['Total','','','',0,'',0,'','','','','','']);
 
+    // Set summaryFormulas
+
+    summaryFormulas.cost[data.bom.name] = "E" + dataArray.length;
+    summaryFormulas.quote[data.bom.name] = "G" + dataArray.length;
+
     dataRanges = dataRanges.concat([
         {
             range: ['A1:M1','A' + dataArray.length + ':M' + dataArray.length],
@@ -361,7 +372,7 @@ async function addBom(data) {
         },
         {
             range: ['G' + dataArray.length],
-            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")+SUM(F' + expenseData.rowFirst + ':F' + expenseData.rowLast + ')',
+            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")+SUM(G' + expenseData.rowFirst + ':G' + expenseData.rowLast + ')',
             numberFormat: '$#,###.00'
         },
         {
@@ -373,103 +384,6 @@ async function addBom(data) {
     await excel.addData(data.bom.name, {
         data: dataArray,
         ranges: dataRanges
-    });
-}
-
-async function setLinkedValues() {
-
-    Excel.run(async (context) => {
-
-        // Get BOM values
-
-        var linkedValues = {};
-
-        var sheets = context.workbook.worksheets;
-    
-        sheets.load("items/name");
-
-        await context.sync();
-
-        sheets.items.forEach(async function (sheet) {
-
-            if (sheet.name != 'Summary') {
-
-                var range = sheet.getRange();
-
-                range.load('values');
-                
-                await context.sync();
-
-                if (range.values.length && range.values[0][0] == 'Quantity') {
-/*
-                    var values = {
-                        labor: {},
-                        cost: range.values[range.values.length - 1][4],
-                        quote: range.values[range.values.length - 1][6]
-                    }; 
-*//*
-                    var labor = false;
-
-                    for (var i = 0; i < range.values.length; i++) {
-
-                        var v = range.values[i];
-
-                        if (labor) {
-
-                            if (v[0] == LABEL_EXPENSES) exit;
-
-                            if (v[3] != '') {
-                                
-                                values.labor[v[1]][v[2]] = {
-                                    qty: v[0],
-                                    cost: v[3]
-                                }
-                            }
-                        }
-                        else if (v[0] == LABEL_LABOR) {
-                            
-                            labor = true;
-                        }
-                    }
-*/
-                    //linkedValues[sheet.name] = values;
-                }
-            }
-        });
-return;
-        // Set Summary formulas
-
-        var sheet = context.workbook.worksheets.getItem('Summary');
-
-        var itemsRange = sheet.getRange('A:A').find(LABEL_ITEMS, {
-            completeMatch: true, /* Match the whole cell value, not any part of the text. */
-            matchCase: false /* Make the search case-insensitive. */,
-            searchDirection: Excel.SearchDirection.forward
-        });
-
-        var laborRange = sheet.getRange('A:A').find(LABEL_LABOR, {
-            completeMatch: true, /* Match the whole cell value, not any part of the text. */
-            matchCase: false /* Make the search case-insensitive. */,
-            searchDirection: Excel.SearchDirection.forward,
-            after: itemsRange
-        });
-
-        var expRange = sheet.getRange('A:A').find(LABEL_EXPENSES, {
-            completeMatch: true, /* Match the whole cell value, not any part of the text. */
-            matchCase: false /* Make the search case-insensitive. */,
-            searchDirection: Excel.SearchDirection.forward,
-            after: laborRange
-        });
-
-        itemsRange.load('rowIndex');
-        laborRange.load('rowIndex');
-        expRange.load('rowIndex');
-                
-        context.sync();
-return;
-        var range = sheet.getRange('A' + (laborRange.rowIndex + 2) + ':D' + expRange.rowIndex - 1);
-
-        range.load('values');
     });
 }
 
@@ -512,12 +426,29 @@ function getItemData(data) {
             0
         ]);
 
-        if (!item.isBom) {
+        if (data.isSummary) {
 
-            itemData.ranges.push({
-                range: ['B' + (itemData.rowFirst + i),'D' + (itemData.rowFirst + i)],
-                color: COLOR_INPUT
-            });
+            if (item.isBom) {
+
+                var bomName = item.description;
+
+                itemData.ranges.push({
+                    range: ['D' + (itemData.rowFirst + i)],
+                    formula: "'" + bomName + "'!" + summaryFormulas.cost[bomName]
+                });
+
+                itemData.ranges.push({
+                    range: ['F' + (itemData.rowFirst + i)],
+                    formula: "'" + bomName + "'!" + summaryFormulas.quote[bomName]
+                });
+            }
+            else {
+
+                itemData.ranges.push({
+                    range: ['B' + (itemData.rowFirst + i),'D' + (itemData.rowFirst + i)],
+                    color: COLOR_INPUT
+                });
+            }
         }
     }
 
@@ -614,6 +545,30 @@ function getLaborData(data) {
             var labor = objLabor[key][i];
 
             laborData.values.push([labor.quantity,'',labor.name,labor.cost,0,0,0]);
+
+            var row = (laborData.rowFirst + laborData.values.length - 2);
+
+            var idString = labor.id.toString();
+
+            if (data.isSummary) {
+
+                laborData.ranges.push({
+                    range: ['A' + row],
+                    formula: summaryFormulas.labor[key][idString]
+                });
+                console.log(JSON.stringify(laborData.ranges));
+            }
+            else {
+
+                if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
+
+                if (summaryFormulas.labor[key][idString])
+                    summaryFormulas.labor[key][idString] += '+';
+                else
+                    summaryFormulas.labor[key][idString] = '';
+
+                summaryFormulas.labor[key][idString] += ("'" + data.boms[0].name + "'!A" + row);
+            }
         }
     }
 
