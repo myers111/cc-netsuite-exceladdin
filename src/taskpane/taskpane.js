@@ -135,6 +135,10 @@ async function onQuote() {
 
 async function onRevision() {
 
+    var id = $('#revisionList').val();
+
+    if (!id) return;
+
     summaryFormulas = {
         labor: {},
         cost: {},
@@ -144,7 +148,7 @@ async function onRevision() {
     var params = {
         path: 'revision',
         options: {
-            id: $('#revisionList').val(),
+            id: id,
             quoteId: $('#quoteList').val()
         }
     };
@@ -763,53 +767,119 @@ function getExpenseData(data) {
 
 async function onReload() {
 
-
+    onRevision();
 }
 
 async function onSave() {
 
-}
-/*
-async function saveSummary() {
+    var revisionId = $('#revisionList').val();
 
-    var quoteId = $('#quoteList').val();
-
-    if (!quoteId) return;
+    if (!revisiond) return;
 
     try {
 
         await Excel.run(async (context) => {
 
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
+            var data = {
+                id: revisionId,
+                defaultMU: 0,
+                items: [],
+                boms: []
+            };
 
-            var range = sheet.getUsedRange();
-
-            range.load("values");
+            var sheets = context.workbook.worksheets;
+        
+            sheets.load("items/name");
 
             await context.sync();
 
-            range.values.shift();
+            sheets.items.forEach(async function (sheet) {
 
-            var quote = {
-                id: quoteId,
-                items: []
-            };
+                var range = sheet.getRange();
 
-            for (var i = 0; i < range.values.length; i++) {
-            
-                var values = range.values[i];
+                range.load('values');
+                    
+                await context.sync();
 
-                //if (!values[0].length) break;
+                if (sheet.name == 'Summary')
+                    data.defaultMU = range.values[1][6];
+                else if (!range.values.length)
+                    return;
+                else if (range.values[0][0] != 'Quantity')
+                    return;
+                else
+                    data.boms.push({items: [], labor: [], expenses: []});
 
-                quote.items.push({
-                    quantity: values[0],
-                    description: values[1]
-                });
-            }
+                var section = '';
+
+                for (var i = 0; i < range.values.length; i++) {
+                
+                    var values = range.values[i];
+
+                    switch (values[0]) {
+                        case LABEL_ITEMS:
+                        case LABEL_LABOR:
+                        case LABEL_EXPENSES:
+                            if ((sheet.name == 'Summary' && i >= 9) || sheet.name != 'Summary') section = values[0];
+                            break;
+                        case 'Total':
+                            section = '';
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (section == LABEL_ITEMS) {
+
+                        if (sheet.name == 'Summary') {
+
+                            data.items.push({
+                                quantity: values[0],
+                                name: values[1],
+                                description: values[2],
+                                price: values[3]
+                            });
+                        }
+                        else {
+
+                            data.boms[data.boms.length - 1].items.push({
+                                quantity: values[0],
+                                name: values[1],
+                                description: values[2],
+                                price: values[3],
+                                units: values[7],
+                                vendor: values[8],
+                                manufacturer: values[9],
+                                mpn: values[10],
+                                markUp: values[11],
+                                discount: values[12]
+                            });
+                        }
+                    }
+                    else if (section == LABEL_LABOR) {
+
+                        data.boms[data.boms.length - 1].labor.push({
+                            quantity: values[0],
+                            group: values[1],
+                            item: values[2],
+                            price: values[3]
+                        });
+                    }
+                    else if (section == LABEL_EXPENSES) {
+
+                        data.boms[data.boms.length - 1].expenses.push({
+                            quantity: values[1],
+                            price: values[2],
+                            markUp: values[4],
+                            discount: values[5]
+                        });
+                    }
+                }
+            });
 
             var params = {
-                path: 'quote-summary',
-                options: {quote: quote}
+                path: 'revision',
+                options: {data: data}
             };
 
             await api.post(params);
@@ -820,201 +890,3 @@ async function saveSummary() {
         console.error(error);
     }
 }
-
-async function saveOverview() {
-
-    var quoteId = $('#quoteList').val();
-
-    if (!quoteId) return;
-
-    try {
-
-        await Excel.run(async (context) => {
-
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            var range = sheet.getRange('E2');
-
-            range.load("values");
-
-            await context.sync();
-
-            var quote = {
-                id: quoteId,
-                defaultMU: range.values[0].values[0]
-            };
-
-            var params = {
-                path: 'quote-overview',
-                options: {quote: quote}
-            };
-
-            await api.post(params);
-        });
-    }
-    catch (error) {
-
-        console.error(error);
-    }
-}
-
-async function saveItems() {
-
-    var bomId = $('#bomList').val();
-
-    try {
-
-        await Excel.run(async (context) => {
-
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            var range = sheet.getUsedRange();
-
-            range.load("values");
-
-            await context.sync();
-
-            range.values.shift();
-
-            var bom = {
-                id: bomId,
-                items: []
-            };
-
-            for (var i = 0; i < range.values.length; i++) {
-            
-                var values = range.values[i];
-
-                if (!values[0].length) break;
-
-                bom.items.push({
-                    name: values[0],
-                    description: values[1],
-                    quantity: values[2],
-                    units: values[3],
-                    price: values[4],
-                    vendor: values[6],
-                    manufacturer: values[7],
-                    mpn: values[8],
-                    markUp: values[9],
-                    discount: values[10]
-                });
-            }
-
-            var params = {
-                path: 'bom-items',
-                options: {bom: bom}
-            };
-
-            await api.post(params);
-        });
-    }
-    catch (error) {
-
-        console.error(error);
-    }
-}
-
-async function saveExpenses() {
-
-    var bomId = $('#bomList').val();
-
-    try {
-
-        await Excel.run(async (context) => {
-
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            var range = sheet.getUsedRange();
-
-            range.load("values");
-
-            await context.sync();
-
-            range.values.shift();
-
-            var bom = {
-                id: bomId,
-                expenses: []
-            };
-
-            for (var i = 0; i < range.values.length; i++) {
-            
-                var values = range.values[i];
-
-                if (!values[0].length) break;
-
-                bom.expenses.push({
-                    quantity: values[1],
-                    price: values[2],
-                    markUp: values[4],
-                    discount: values[5]
-                });
-            }
-
-            var params = {
-                path: 'bom-expenses',
-                options: {bom: bom}
-            };
-
-            await api.post(params);
-        });
-    }
-    catch (error) {
-
-        console.error(error);
-    }
-}
-
-async function saveLabor() {
-
-    var bomId = $('#bomList').val();
-    var laborId = $('#laborList').val();
-
-    try {
-
-        await Excel.run(async (context) => {
-
-            var sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            var range = sheet.getUsedRange();
-
-            range.load("values");
-
-            await context.sync();
-
-            range.values.shift();
-
-            var bom = {
-                id: bomId,
-                laborId: laborId,
-                labor: []
-            };
-
-            for (var i = 0; i < range.values.length; i++) {
-            
-                var values = range.values[i];
-
-                if (!values[0].length) break;
-
-                bom.labor.push({
-                    quantity: values[1],
-                    cost: values[2],
-                    sell: values[4]
-                });
-            }
-
-            var params = {
-                path: 'bom-labor',
-                options: {bom: bom}
-            };
-
-            await api.post(params);
-        });
-    }
-    catch (error) {
-
-        console.error(error);
-    }
-}
-*/
