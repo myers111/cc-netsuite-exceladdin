@@ -14,6 +14,7 @@ const LABEL_HEADER_EX = ['Units','Vendor','Manufacturer','MPN','MU%','Discount']
 const LABEL_LABOR = 'Labor';
 const LABEL_ITEMS = 'Items';
 const LABEL_EXPENSES = 'Expenses';
+const LABEL_TOTAL = 'Total';
 
 /* global console, document, Excel, Office */
 
@@ -210,7 +211,7 @@ async function addSummary(data) {
     dataArray = dataArray.concat(itemData.values);
     dataRanges = dataRanges.concat(itemData.ranges);
 
-    dataArray.push(['Total','','','',0,'',0]);
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0]);
 
     dataRanges = dataRanges.concat([
         {
@@ -357,7 +358,7 @@ async function addBom(data) {
 
     // Totals
 
-    dataArray.push(['Total','','','',0,'',0,'','','','','','']);
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'','','','','','']);
 
     // Set summaryFormulas
 
@@ -560,7 +561,6 @@ function getLaborData(data) {
                     range: ['A' + row],
                     formula: summaryFormulas.labor[key][idString]
                 });
-                console.log(JSON.stringify(laborData.ranges));
             }
             else {
 
@@ -774,7 +774,7 @@ async function onSave() {
 
     var revisionId = $('#revisionList').val();
 
-    if (!revisiond) return;
+    if (!revisionId) return;
 
     try {
 
@@ -793,12 +793,12 @@ async function onSave() {
 
             await context.sync();
 
-            sheets.items.forEach(async function (sheet) {
+            for (const sheet of sheets.items) {
 
-                var range = sheet.getRange();
+                var range = sheet.getUsedRange();
 
                 range.load('values');
-                    
+
                 await context.sync();
 
                 if (sheet.name == 'Summary')
@@ -821,10 +821,10 @@ async function onSave() {
                         case LABEL_LABOR:
                         case LABEL_EXPENSES:
                             if ((sheet.name == 'Summary' && i >= 9) || sheet.name != 'Summary') section = values[0];
-                            break;
-                        case 'Total':
+                            continue;
+                        case LABEL_TOTAL:
                             section = '';
-                            break;
+                            continue;
                         default:
                             break;
                     }
@@ -839,6 +839,7 @@ async function onSave() {
                                 description: values[2],
                                 price: values[3]
                             });
+
                         }
                         else {
 
@@ -875,7 +876,7 @@ async function onSave() {
                         });
                     }
                 }
-            });
+            }
 
             var params = {
                 path: 'revision',
