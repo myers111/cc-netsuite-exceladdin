@@ -10,11 +10,13 @@ module.exports = {
         objExcel = options.excel;
         objGroupbyRows = options.groupByRows;
     },
-    addData: async function (sheetName, options) {
+    addData: async function (sheetName, sheetData, options) {
     
         await objExcel.run(async (context) => {
 
             var sheet = await getSheet(context, sheetName);
+
+            if (options.bomId) sheetData[sheet.id.toString()] = {bomId: options.bomId};
 
             var rangeString = getRangeString({
                 rows: options.data.length,
@@ -77,6 +79,8 @@ module.exports = {
                         if (rangeOptions.bold) range.format.font.bold = true;
                         if (rangeOptions.groupByRows) range.group(Excel.GroupOption.byRows);
                         if (rangeOptions.groupByColumns) range.group(Excel.GroupOption.byColumns);
+                        if (rangeOptions.hideRows) range.rowHidden = rangeOptions.hideRows;
+                        if (rangeOptions.hideColumns) range.columnHidden = rangeOptions.hideColumns;
                     }
                 }
             }

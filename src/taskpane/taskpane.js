@@ -18,6 +18,8 @@ const LABEL_TOTAL = 'Total';
 
 /* global console, document, Excel, Office */
 
+var WORKSHEET = {};
+
 var summaryFormulas = null;
 
 Office.onReady((info) => {
@@ -271,9 +273,13 @@ async function addSummary(data) {
             range: ['G' + dataArray.length],
             formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")'
         },
+        {
+            range:['H:H'],
+            hideColumns: true
+        }
     ]);
 
-    await excel.addData("Summary", {
+    await excel.addData("Summary", WORKSHEET, {
         data: dataArray,
         ranges: dataRanges
     });
@@ -383,12 +389,17 @@ async function addBom(data) {
         {
             range:['H:M'],
             groupByColumns: true
+        },
+        {
+            range:['N:N'],
+            hideColumns: true
         }
     ]);
 
-    await excel.addData(data.bom.name, {
+    await excel.addData(data.bom.name, WORKSHEET, {
         data: dataArray,
-        ranges: dataRanges
+        ranges: dataRanges,
+        bomId: data.bom.id
     });
 }
 
@@ -433,7 +444,7 @@ function getItemData(data) {
 
         if (data.isSummary) {
 
-            if (item.isBom) {
+            if (item.bomId > 0) {
 
                 var bomName = item.description;
 
@@ -493,7 +504,7 @@ function getItemData(data) {
         itemData.ranges = itemData.ranges.concat([
             {
                 range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
-                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,' + data.defaultMU + ')/100),0)'
+                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
             }
         ]);
     }
@@ -559,19 +570,41 @@ function getLaborData(data) {
 
                 laborData.ranges.push({
                     range: ['A' + row],
-                    formula: summaryFormulas.labor[key][idString]
+                    formula: summaryFormulas.labor[key][idString].qty
+                });
+
+                laborData.ranges.push({
+                    range: ['D' + row],
+                    formula: summaryFormulas.labor[key][idString].cost
+                });
+
+                laborData.ranges.push({
+                    range: ['F' + row],
+                    formula: summaryFormulas.labor[key][idString].quote
                 });
             }
             else {
 
                 if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
 
-                if (summaryFormulas.labor[key][idString])
-                    summaryFormulas.labor[key][idString] += '+';
-                else
-                    summaryFormulas.labor[key][idString] = '';
+                if (summaryFormulas.labor[key][idString]) {
 
-                summaryFormulas.labor[key][idString] += ("'" + data.boms[0].name + "'!A" + row);
+                    summaryFormulas.labor[key][idString].qty += '+';
+                    summaryFormulas.labor[key][idString].cost += '+';
+                    summaryFormulas.labor[key][idString].quote += '+';
+                }
+                else {
+
+                    summaryFormulas.labor[key][idString] = {
+                        qty: '',
+                        cost: '',
+                        quote: ''
+                    };
+                }
+
+                summaryFormulas.labor[key][idString].qty += ("'" + data.boms[0].name + "'!A" + row);
+                summaryFormulas.labor[key][idString].cost += ("'" + data.boms[0].name + "'!D" + row);
+                summaryFormulas.labor[key][idString].quote += ("'" + data.boms[0].name + "'!F" + row);
             }
         }
     }
@@ -618,7 +651,7 @@ function getLaborData(data) {
 
                 rngLaborGroup.push({
                     range: ['F' + i],
-                    formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,' + data.defaultMU + ')/100),0)'
+                    formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
                 });
             }
 
@@ -797,7 +830,7 @@ async function onSave() {
 
                 var range = sheet.getUsedRange();
 
-                range.load('values');
+                range.load('values,formulas');
 
                 await context.sync();
 
@@ -808,13 +841,14 @@ async function onSave() {
                 else if (range.values[0][0] != 'Quantity')
                     return;
                 else
-                    data.boms.push({items: [], labor: [], expenses: []});
+                    data.boms.push({id: WORKSHEET[sheet.id.toString()].bomId, items: [], labor: [], expenses: []});
 
                 var section = '';
-
+     
                 for (var i = 0; i < range.values.length; i++) {
                 
                     var values = range.values[i];
+                    var formulas = range.formulas[i];
 
                     switch (values[0]) {
                         case LABEL_ITEMS:
@@ -833,13 +867,14 @@ async function onSave() {
 
                         if (sheet.name == 'Summary') {
 
-                            data.items.push({
+                            var item = {
                                 quantity: values[0],
-                                name: values[1],
-                                description: values[2],
-                                price: values[3]
-                            });
+                                description: values[2]
+                            };
 
+                            if (formulas[3].substring(0,1) != '=') item['price'] = values[3];
+
+                            data.items.push(item);
                         }
                         else {
 
