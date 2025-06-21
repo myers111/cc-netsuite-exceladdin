@@ -176,14 +176,14 @@ async function onRevision() {
 async function addSummary(data) {
 
     var dataArray = [
-        ['Quote','','','','','',0],
-        ['MU (Default)','','','','','',(data.defaultMU / 100)],
-        ['GM','','','','','',0],
-        ['MU','','','','Cost','Quote',0],
-        [LABEL_ITEMS,'','','',0,0,0],
-        [LABEL_LABOR,'','','',0,0,0],
-        ['','','','','','',''],
-        LABEL_HEADER
+        ['Quote','','','','','',0,''],
+        ['MU (Default)','','','','','',(data.defaultMU / 100),''],
+        ['GM','','','','','',0,''],
+        ['MU','','','','Cost','Quote',0,''],
+        [LABEL_ITEMS,'','','',0,0,0,''],
+        [LABEL_LABOR,'','','',0,0,0,''],
+        ['','','','','','','',''],
+        LABEL_HEADER.concat([''])
     ];
 
     var dataRanges = [
@@ -213,7 +213,7 @@ async function addSummary(data) {
     dataArray = dataArray.concat(itemData.values);
     dataRanges = dataRanges.concat(itemData.ranges);
 
-    dataArray.push([LABEL_TOTAL,'','','',0,'',0]);
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'']);
 
     dataRanges = dataRanges.concat([
         {
@@ -288,7 +288,7 @@ async function addSummary(data) {
 async function addBom(data) {
 
     var dataArray = [
-        LABEL_HEADER.concat(LABEL_HEADER_EX)
+        LABEL_HEADER.concat(LABEL_HEADER_EX).concat([''])
     ];
 
     var dataRanges = [];
@@ -302,26 +302,6 @@ async function addBom(data) {
         rowFirst: dataArray.length + 1,
         isSummary: false
     });
-
-    itemData.values[0] = itemData.values[0].concat(['','','','','','']);
-
-    for (var i = 0; i < data.bom.items.length; i++) {
-    
-        var item = data.bom.items[i];
-
-        var markup = (item.markup ? parseFloat(item.markup) : 0);
-
-        var index = i + 1;
-
-        itemData.values[index] = itemData.values[index].concat([
-            item.units,
-            (item.vendorId ? item.vendor : item.newVendor),
-            item.manufacturer,
-            item.mpn,
-            (markup > 0 ? markup : ''),
-            (item.discount == 'T' ? 'Yes' : 'No')
-        ]);
-    }
 
     itemData.ranges = itemData.ranges.concat([
         {
@@ -342,11 +322,6 @@ async function addBom(data) {
         isSummary: false
     });
 
-    for (var i = 0; i < laborData.values.length; i++) {
-    
-        laborData.values[i] = laborData.values[i].concat(['','','','','','']);
-    }
-
     dataArray = dataArray.concat(laborData.values);
     dataRanges = dataRanges.concat(laborData.ranges);
 
@@ -364,7 +339,7 @@ async function addBom(data) {
 
     // Totals
 
-    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'','','','','','']);
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'','','','','','','']);
 
     // Set summaryFormulas
 
@@ -423,6 +398,10 @@ function getItemData(data) {
         rowLast: 0
     };
 
+    if (!data.isSummary) { itemData.values[0] = itemData.values[0].concat(['','','','','','']); } // Add spaces for extra columns
+
+    itemData.values[0].push(''); // Add space for hidden ID column
+
     // Set values
 
     for (var i = 0; i < data.items.length; i++) {
@@ -466,6 +445,21 @@ function getItemData(data) {
                 });
             }
         }
+        else {
+
+            var markup = (item.markup ? parseFloat(item.markup) : 0);
+
+            itemData.values[itemData.values.length - 1] = itemData.values[itemData.values.length - 1].concat([
+                item.units,
+                (item.vendorId ? item.vendor : item.newVendor),
+                item.manufacturer,
+                item.mpn,
+                (markup > 0 ? markup : ''),
+                (item.discount == 'T' ? 'Yes' : 'No')
+            ]);
+        }
+
+        itemData.values[itemData.values.length - 1].push((data.isSummary ? (item.bomId ? item.bomId : item.id) : item.id)); // Add bomId for items with bom, otherwise itemId
     }
 
     itemData.rowLast = itemData.rowFirst + itemData.values.length - 2;
@@ -530,6 +524,10 @@ function getLaborData(data) {
         rowLast: 0
     };
 
+    if (!data.isSummary) { laborData.values[0] = laborData.values[0].concat(['','','','','','']); } // Add spaces for extra columns
+
+    laborData.values[0].push(''); // Add space for hidden ID column
+
     // Create labor object
 
     var objLabor = {};
@@ -554,7 +552,13 @@ function getLaborData(data) {
 
         if (!objLabor.hasOwnProperty(key)) continue;
 
-        laborData.values.push([0,key,'','',0,'',0]);
+        var groupArray = [0,key,'','',0,'',0];
+
+        if (!data.isSummary) { groupArray = groupArray.concat(['','','','','','']); } // Add spaces for extra columns
+
+        groupArray.push(''); // Add space for hidden ID column
+
+        laborData.values.push(groupArray);
 
         for (var i = 0; i < objLabor[key].length; i++) {
 
@@ -585,6 +589,8 @@ function getLaborData(data) {
             }
             else {
 
+                if (!data.isSummary) { laborData.values[laborData.values.length - 1] = laborData.values[laborData.values.length - 1].concat(['','','','','','']); } // Add spaces for extra columns
+
                 if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
 
                 if (summaryFormulas.labor[key][idString]) {
@@ -606,6 +612,8 @@ function getLaborData(data) {
                 summaryFormulas.labor[key][idString].cost += ("'" + data.boms[0].name + "'!D" + row);
                 summaryFormulas.labor[key][idString].quote += ("'" + data.boms[0].name + "'!F" + row);
             }
+
+            laborData.values[laborData.values.length - 1].push(labor.id); // Add record ID to hidden column
         }
     }
 
@@ -712,7 +720,7 @@ function getExpenseData(data) {
     
     var expenseData = {
         values: [
-            [LABEL_EXPENSES,'','','','','','','','','','','','']
+            [LABEL_EXPENSES,'','','','','','','','','','','','','']
         ],
         ranges: [
             {
@@ -748,7 +756,8 @@ function getExpenseData(data) {
             '',
             '',
             (markup > 0 ? markup : ''),
-            (expense.discount == 'T' ? 'Yes' : 'No')
+            (expense.discount == 'T' ? 'Yes' : 'No'),
+            ''
         ]);   
     }
 
@@ -879,6 +888,7 @@ async function onSave() {
                         else {
 
                             data.boms[data.boms.length - 1].items.push({
+                                id: values[13],
                                 quantity: values[0],
                                 name: values[1],
                                 description: values[2],
@@ -895,6 +905,7 @@ async function onSave() {
                     else if (section == LABEL_LABOR) {
 
                         data.boms[data.boms.length - 1].labor.push({
+                            id: values[13],
                             quantity: values[0],
                             group: values[1],
                             item: values[2],

@@ -86,7 +86,7 @@ module.exports = {
             }
 
             var rangeString = getRangeString({
-                columns: options.data[0].length
+                columns: options.data[0].length - 1 // Subtract 1 for hidden column
             });
 
             sheet.getRange(rangeString).format.autofitColumns();
