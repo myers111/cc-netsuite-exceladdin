@@ -176,15 +176,20 @@ async function onRevision() {
 async function addSummary(data) {
 
     var dataArray = [
-        ['Quote','','','','','',0,''],
-        ['MU (Default)','','','','','',(data.defaultMU / 100),''],
-        ['GM','','','','','',0,''],
-        ['MU','','','','Cost','Quote',0,''],
-        [LABEL_ITEMS,'','','',0,0,0,''],
-        [LABEL_LABOR,'','','',0,0,0,''],
-        ['','','','','','','',''],
-        LABEL_HEADER.concat([''])
+        ['Quote','','','','','',0],
+        ['MU (Default)','','','','','',(data.defaultMU / 100)],
+        ['GM','','','','','',0],
+        ['MU','','','','Cost','Quote',0],
+        [LABEL_ITEMS,'','','',0,0,0],
+        [LABEL_LABOR,'','','',0,0,0],
+        ['','','','','','',''],
+        LABEL_HEADER
     ];
+
+    for (var i = 0; i < dataArray.length; i++) {
+
+        dataArray[i] = dataArray[i].concat(['','','']); // Add spaces for hidden columns
+    }
 
     var dataRanges = [
         {
@@ -213,7 +218,9 @@ async function addSummary(data) {
     dataArray = dataArray.concat(itemData.values);
     dataRanges = dataRanges.concat(itemData.ranges);
 
-    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'']);
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0]);
+
+    dataArray[dataArray.length - 1] = dataArray[dataArray.length - 1].concat(['','','']); // Add spaces for hidden columns
 
     dataRanges = dataRanges.concat([
         {
@@ -274,21 +281,22 @@ async function addSummary(data) {
             formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")'
         },
         {
-            range:['H:H'],
+            range:['H:J'],
             hideColumns: true
         }
     ]);
 
     await excel.addData("Summary", WORKSHEET, {
         data: dataArray,
-        ranges: dataRanges
+        ranges: dataRanges,
+        autofitColumns: 7
     });
 }
 
 async function addBom(data) {
 
     var dataArray = [
-        LABEL_HEADER.concat(LABEL_HEADER_EX).concat([''])
+        LABEL_HEADER.concat(LABEL_HEADER_EX).concat(['','',''])
     ];
 
     var dataRanges = [];
@@ -326,7 +334,7 @@ async function addBom(data) {
     dataRanges = dataRanges.concat(laborData.ranges);
 
     // Expenses
-    
+
     var expenseData = getExpenseData({
         defaultMU: data.defaultMU,
         expenses: data.bom.expenses,
@@ -339,7 +347,9 @@ async function addBom(data) {
 
     // Totals
 
-    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'','','','','','','']);
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'','','','','','']);
+
+    dataArray[dataArray.length - 1] = dataArray[dataArray.length - 1].concat(['','','']); // Add spaces for hidden columns
 
     // Set summaryFormulas
 
@@ -366,7 +376,7 @@ async function addBom(data) {
             groupByColumns: true
         },
         {
-            range:['N:N'],
+            range:['N:P'],
             hideColumns: true
         }
     ]);
@@ -374,7 +384,8 @@ async function addBom(data) {
     await excel.addData(data.bom.name, WORKSHEET, {
         data: dataArray,
         ranges: dataRanges,
-        bomId: data.bom.id
+        bomId: data.bom.id,
+        autofitColumns: 13
     });
 }
 
@@ -400,7 +411,7 @@ function getItemData(data) {
 
     if (!data.isSummary) { itemData.values[0] = itemData.values[0].concat(['','','','','','']); } // Add spaces for extra columns
 
-    itemData.values[0].push(''); // Add space for hidden ID column
+    itemData.values[0] = itemData.values[0].concat(['','','']); // Add spaces for hidden columns
 
     // Set values
 
@@ -420,6 +431,8 @@ function getItemData(data) {
             0,
             0
         ]);
+
+        var itemDataValuesLength = itemData.values.length;
 
         if (data.isSummary) {
 
@@ -449,7 +462,7 @@ function getItemData(data) {
 
             var markup = (item.markup ? parseFloat(item.markup) : 0);
 
-            itemData.values[itemData.values.length - 1] = itemData.values[itemData.values.length - 1].concat([
+            itemData.values[itemDataValuesLength - 1] = itemData.values[itemDataValuesLength - 1].concat([
                 item.units,
                 (item.vendorId ? item.vendor : item.newVendor),
                 item.manufacturer,
@@ -459,7 +472,9 @@ function getItemData(data) {
             ]);
         }
 
-        itemData.values[itemData.values.length - 1].push((data.isSummary ? (item.bomId ? item.bomId : item.id) : item.id)); // Add bomId for items with bom, otherwise itemId
+        itemData.values[itemDataValuesLength - 1].push(item.id); // Add item ID for hidden column
+        itemData.values[itemDataValuesLength - 1].push(data.isSummary ? item.bomId  : 0); // Add bom ID for hidden column
+        itemData.values[itemDataValuesLength - 1].push('');
     }
 
     itemData.rowLast = itemData.rowFirst + itemData.values.length - 2;
@@ -526,7 +541,7 @@ function getLaborData(data) {
 
     if (!data.isSummary) { laborData.values[0] = laborData.values[0].concat(['','','','','','']); } // Add spaces for extra columns
 
-    laborData.values[0].push(''); // Add space for hidden ID column
+    laborData.values[0] = laborData.values[0].concat(['','','']); // Add spaces for hidden columns
 
     // Create labor object
 
@@ -556,7 +571,7 @@ function getLaborData(data) {
 
         if (!data.isSummary) { groupArray = groupArray.concat(['','','','','','']); } // Add spaces for extra columns
 
-        groupArray.push(''); // Add space for hidden ID column
+        groupArray = groupArray.concat(['','','']); // Add spaces for hidden columns
 
         laborData.values.push(groupArray);
 
@@ -566,11 +581,15 @@ function getLaborData(data) {
 
             laborData.values.push([labor.quantity,'',labor.name,labor.cost,0,0,0]);
 
-            var row = (laborData.rowFirst + laborData.values.length - 2);
+            var laborDataValuesLength = laborData.values.length;
+
+            var row = (laborData.rowFirst + laborDataValuesLength - 2);
 
             var idString = labor.id.toString();
 
             if (data.isSummary) {
+
+                laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat(['','','']); // Add spaces for hidden columns
 
                 laborData.ranges.push({
                     range: ['A' + row],
@@ -589,7 +608,11 @@ function getLaborData(data) {
             }
             else {
 
-                if (!data.isSummary) { laborData.values[laborData.values.length - 1] = laborData.values[laborData.values.length - 1].concat(['','','','','','']); } // Add spaces for extra columns
+                laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat(['','','','','','']); // Add spaces for extra columns
+
+                laborData.values[laborDataValuesLength - 1].push(labor.recId); // Add record ID to hidden column
+                laborData.values[laborDataValuesLength - 1].push(labor.groupId); // Add group ID to hidden column
+                laborData.values[laborDataValuesLength - 1].push(labor.id); // Add item ID to hidden column
 
                 if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
 
@@ -612,8 +635,6 @@ function getLaborData(data) {
                 summaryFormulas.labor[key][idString].cost += ("'" + data.boms[0].name + "'!D" + row);
                 summaryFormulas.labor[key][idString].quote += ("'" + data.boms[0].name + "'!F" + row);
             }
-
-            laborData.values[laborData.values.length - 1].push(labor.id); // Add record ID to hidden column
         }
     }
 
@@ -720,7 +741,7 @@ function getExpenseData(data) {
     
     var expenseData = {
         values: [
-            [LABEL_EXPENSES,'','','','','','','','','','','','','']
+            [LABEL_EXPENSES,'','','','','','','','','','','','']
         ],
         ranges: [
             {
@@ -731,6 +752,8 @@ function getExpenseData(data) {
         rowFirst: data.rowFirst + 1,
         rowLast: 0
     };
+
+    expenseData.values[0] = expenseData.values[0].concat(['','','']); // Add spaces for hidden columns
 
     // Set values
 
@@ -756,9 +779,10 @@ function getExpenseData(data) {
             '',
             '',
             (markup > 0 ? markup : ''),
-            (expense.discount == 'T' ? 'Yes' : 'No'),
-            ''
+            (expense.discount == 'T' ? 'Yes' : 'No')
         ]);   
+
+        expenseData.values[expenseData.values.length - 1] = expenseData.values[expenseData.values.length - 1].concat(['','','']); // Add spaces for hidden columns
     }
 
     expenseData.rowLast = expenseData.rowFirst + expenseData.values.length - 2;
@@ -905,7 +929,7 @@ async function onSave() {
                     else if (section == LABEL_LABOR) {
 
                         data.boms[data.boms.length - 1].labor.push({
-                            id: values[13],
+                            recId: values[13],
                             quantity: values[0],
                             group: values[1],
                             item: values[2],

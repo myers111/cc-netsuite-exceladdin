@@ -85,11 +85,14 @@ module.exports = {
                 }
             }
 
-            var rangeString = getRangeString({
-                columns: options.data[0].length - 1 // Subtract 1 for hidden column
-            });
+            if (options.autofitColumns) {
 
-            sheet.getRange(rangeString).format.autofitColumns();
+                var rangeString = getRangeString({
+                    columns: options.autofitColumns
+                });
+
+                sheet.getRange(rangeString).format.autofitColumns();
+            }
 
             await context.sync();
         });
