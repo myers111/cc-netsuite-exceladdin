@@ -782,7 +782,9 @@ function getExpenseData(data) {
             (expense.discount == 'T' ? 'Yes' : 'No')
         ]);   
 
-        expenseData.values[expenseData.values.length - 1] = expenseData.values[expenseData.values.length - 1].concat(['','','']); // Add spaces for hidden columns
+        expenseData.values[expenseData.values.length - 1].push(expense.accountId); // Add account ID for hidden column
+        expenseData.values[expenseData.values.length - 1].push('');
+        expenseData.values[expenseData.values.length - 1].push('');
     }
 
     expenseData.rowLast = expenseData.rowFirst + expenseData.values.length - 2;
@@ -913,6 +915,7 @@ async function onSave() {
 
                             data.boms[data.boms.length - 1].items.push({
                                 id: values[13],
+                                bomId: values[14],
                                 quantity: values[0],
                                 name: values[1],
                                 description: values[2],
@@ -930,6 +933,8 @@ async function onSave() {
 
                         data.boms[data.boms.length - 1].labor.push({
                             recId: values[13],
+                            groupId: values[14],
+                            id: values[15],
                             quantity: values[0],
                             group: values[1],
                             item: values[2],
@@ -939,6 +944,7 @@ async function onSave() {
                     else if (section == LABEL_EXPENSES) {
 
                         data.boms[data.boms.length - 1].expenses.push({
+                            accountId:values[13],
                             quantity: values[1],
                             price: values[2],
                             markUp: values[4],
