@@ -242,11 +242,11 @@ async function addSummary(data) {
         },
         {
             range: ['G3'],
-            formula: '($G$1-SUM($G' + itemData.rowFirst + ':$G' + itemData.rowLast + '))/IF($G$1>0,$G$1,1)'
+            formula: '($G$1-$E$' + dataArray.length + ')/IF($G$1>0,$G$1,1)'
         },
         {
             range: ['G4'],
-            formula: '($G$1-SUM($G' + itemData.rowFirst + ':$G' + itemData.rowLast + '))/IF(SUM($G' + itemData.rowFirst + ':$G' + itemData.rowLast + ')>0,SUM($G' + itemData.rowFirst + ':$G' + itemData.rowLast + '),1)'
+            formula: '($G$1-$E$' + dataArray.length + ')/IF($E$' + dataArray.length + '>0,$E$' + dataArray.length + ',1)'
         },
         {
             range: ['E5'],
@@ -274,11 +274,11 @@ async function addSummary(data) {
         },
         {
             range: ['E' + dataArray.length],
-            formula: 'SUM(E' + itemData.rowFirst + ':E' + itemData.rowLast + ')+SUMIFS(E' + laborData.rowFirst + ':E' + laborData.rowLast + ',D' + laborData.rowFirst + ':D' + laborData.rowLast + ',"<>")'
+            formula: 'SUM(E' + itemData.rowFirst + ':E' + itemData.rowLast + ')'
         },
         {
             range: ['G' + dataArray.length],
-            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")'
+            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')'
         },
         {
             range:['H:J'],
@@ -823,7 +823,7 @@ function getExpenseData(data) {
         expenseData.ranges = expenseData.ranges.concat([
             {
                 range: ['F' + expenseData.rowFirst + ':F' + expenseData.rowLast],
-                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,' + data.defaultMU + ')/100),0)'
+                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
             }
         ]);
     }
@@ -946,9 +946,9 @@ async function onSave() {
                         data.boms[data.boms.length - 1].expenses.push({
                             accountId:values[13],
                             quantity: values[1],
-                            price: values[2],
-                            markUp: values[4],
-                            discount: values[5]
+                            price: values[3],
+                            markUp: values[11],
+                            discount: values[12]
                         });
                     }
                 }
