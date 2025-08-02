@@ -81,6 +81,8 @@ module.exports = {
                         if (rangeOptions.groupByColumns) range.group(Excel.GroupOption.byColumns);
                         if (rangeOptions.hideRows) range.rowHidden = rangeOptions.hideRows;
                         if (rangeOptions.hideColumns) range.columnHidden = rangeOptions.hideColumns;
+                        if (rangeOptions.dataValidationRule) range.dataValidation.rule = rangeOptions.dataValidationRule;
+                        if (rangeOptions.columnWidth) range.format.columnWidth = rangeOptions.columnWidth;
                     }
                 }
             }
@@ -90,16 +92,23 @@ module.exports = {
                 var rangeString = getRangeString({
                     columns: options.autofitColumns
                 });
-
+                
                 sheet.getRange(rangeString).format.autofitColumns();
             }
 
             await context.sync();
         });
+    },
+    clearData: async function (sheetName = null) {
+
+        await objExcel.run(async (context) => {
+
+            clear(context, sheetName);
+        });
     }
 };
 
-async function clearData(context, sheetName = null) {
+async function clear(context, sheetName = null) {
 
     var sheet = null;
 
@@ -160,14 +169,14 @@ async function getSheet(context, sheetName = null) {
         }
         else {
 
-            await clearData(context, sheetName);
+            await clear(context, sheetName);
         }
     }
     else {
 
         sheet = context.workbook.worksheets.getActiveWorksheet();
 
-        await clearData(context);
+        await clear(context);
     }
 
     if (sheetName == 'Summary') sheet.position = 0;

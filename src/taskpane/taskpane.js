@@ -37,15 +37,14 @@ Office.onReady((info) => {
         initList('customer');
         initList('project');
         initList('quote');
-        initList('revision', false);
     }
 });
 
-async function initList(id, onFocus = true) {
+async function initList(id) {
 
     var selector = '#' + id + 'List';
 
-    if (onFocus) $(selector).focus(function() { loadList(id); });
+    $(selector).focus(function() { loadList(id); });
 
     $(selector).on('change', function() { onChange(id); });
 }
@@ -89,9 +88,6 @@ function getOptions(id) {
     var options = {};
 
     switch (id) {
-        case 'revision':
-            var quoteId = $('#quoteList').val();
-            if (parseInt(quoteId)) options['quoteId'] = quoteId;
         case 'quote':
             var projectId = $('#projectList').val();
             if (parseInt(projectId)) options['projectId'] = projectId;
@@ -105,17 +101,15 @@ function getOptions(id) {
 
 async function onChange(id) {
 
+    await excel.clearData();
+
     switch (id) {
         case 'customer':
             emptyList("project");
         case 'project':
             emptyList("quote");
         case 'quote':
-            emptyList("revision");
             await onQuote();
-            break;
-        case 'revision':
-            await onRevision();
     }
 }
 
@@ -127,50 +121,37 @@ async function onQuote() {
 
     if (quoteId) {
 
-        await loadList('revision');
+        summaryFormulas = {
+            labor: {},
+            cost: {},
+            quote: {}
+        };
 
-        onRevision();
-    }
+        var params = {
+            path: 'quote',
+            options: {
+                id: quoteId
+            }
+        };
 
-    document.getElementById("revisionControls").style.display = (quoteId > 0 ? '' : 'none');
-    document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
-}
+        var data = await api.get(params);
 
-async function onRevision() {
+        const promises = [];
 
-    var id = $('#revisionList').val();
+        for (var i = 0; i < data.boms.length; i++) {
 
-    if (!id) return;
-
-    summaryFormulas = {
-        labor: {},
-        cost: {},
-        quote: {}
-    };
-
-    var params = {
-        path: 'revision',
-        options: {
-            id: id,
-            quoteId: $('#quoteList').val()
+            promises.push(addBom({
+                defaultMU: data.defaultMU,
+                bom: data.boms[i]
+            }));
         }
-    };
 
-    var data = await api.get(params);
+        await Promise.all(promises);
 
-    const promises = [];
-
-    for (var i = 0; i < data.boms.length; i++) {
-
-        promises.push(addBom({
-            defaultMU: data.defaultMU,
-            bom: data.boms[i]
-        }));
+        //await addSummary(data);
     }
 
-    await Promise.all(promises);
-
-    await addSummary(data);
+    document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
 }
 
 async function addSummary(data) {
@@ -376,8 +357,12 @@ async function addBom(data) {
             groupByColumns: true
         },
         {
-            range:['N:P'],
+            range:['O:P'],
             hideColumns: true
+        },
+        {
+            range:['N:N'],
+            columnWidth: 15
         }
     ]);
 
@@ -425,7 +410,7 @@ function getItemData(data) {
         itemData.values.push([
             quantity,
             (item.id == NEW_ITEM ? item.newItem : item.name),
-            (item.id == NEW_ITEM ? item.newDescription : item.description),
+            item.description,
             price,
             0,
             0,
@@ -472,9 +457,9 @@ function getItemData(data) {
             ]);
         }
 
+        itemData.values[itemDataValuesLength - 1].push(''); // Add item ID for group control
         itemData.values[itemDataValuesLength - 1].push(item.id); // Add item ID for hidden column
         itemData.values[itemDataValuesLength - 1].push(data.isSummary ? item.bomId  : 0); // Add bom ID for hidden column
-        itemData.values[itemDataValuesLength - 1].push('');
     }
 
     itemData.rowLast = itemData.rowFirst + itemData.values.length - 2;
@@ -487,7 +472,7 @@ function getItemData(data) {
             horizontalAlignment: 'center'
         },
         {
-            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'C' + itemData.rowFirst + ':C' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'C' + itemData.rowFirst + ':C' + itemData.rowLast,'H' + itemData.rowFirst + ':M' + itemData.rowLast],
             color: COLOR_INPUT
         },
         {
@@ -514,6 +499,13 @@ function getItemData(data) {
             {
                 range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
                 formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
+            },
+            {
+                range: ['M' + itemData.rowFirst + ':M' + itemData.rowLast],
+                dataValidationRule: {list: {
+                    inCellDropDown: true,
+                    source: "Yes,No"
+                }}
             }
         ]);
     }
@@ -553,11 +545,11 @@ function getLaborData(data) {
 
             var labor = data.boms[i].labor[j];
 
-            if (!objLabor[labor.groupName]) objLabor[labor.groupName] = [];
+            if (!objLabor[labor.sgName]) objLabor[labor.sgName] = [];
 
-            var index = objLabor[labor.groupName].findIndex(obj => obj.id == labor.id && obj.cost == labor.cost);
+            var index = objLabor[labor.sgName].findIndex(obj => obj.id == labor.id && obj.price == labor.price); // See if labor role already exists
 
-            if (index < 0) objLabor[labor.groupName].push(labor);
+            if (index < 0) objLabor[labor.sgName].push(labor);
         }
     }
 
@@ -579,7 +571,7 @@ function getLaborData(data) {
 
             var labor = objLabor[key][i];
 
-            laborData.values.push([labor.quantity,'',labor.name,labor.cost,0,0,0]);
+            laborData.values.push([labor.quantity,'',labor.name,labor.price,0,0,0]);
 
             var laborDataValuesLength = laborData.values.length;
 
@@ -610,9 +602,9 @@ function getLaborData(data) {
 
                 laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat(['','','','','','']); // Add spaces for extra columns
 
-                laborData.values[laborDataValuesLength - 1].push(labor.recId); // Add record ID to hidden column
-                laborData.values[laborDataValuesLength - 1].push(labor.groupId); // Add group ID to hidden column
+                laborData.values[laborDataValuesLength - 1].push(''); // Add item ID for group control
                 laborData.values[laborDataValuesLength - 1].push(labor.id); // Add item ID to hidden column
+                laborData.values[laborDataValuesLength - 1].push(labor.sgId); // Add group ID to hidden column
 
                 if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
 
@@ -650,6 +642,10 @@ function getLaborData(data) {
         {
             range: ['D' + laborData.rowFirst + ':G' + laborData.rowLast],
             numberFormat: '$#,###.00'
+        },
+        {
+            range: [laborData.rowFirst + ':' + laborData.rowLast],
+            groupByRows: true
         }
     ]);
 
@@ -659,7 +655,7 @@ function getLaborData(data) {
 
     var rowSum = 0;
 
-    for (var i = laborData.rowFirst; i < laborData.rowLast; i++) {
+    for (var i = laborData.rowFirst; i <= laborData.rowLast; i++) {
 
         var index = i - laborData.rowFirst + 1;
 
@@ -728,11 +724,6 @@ function setLaborGroupRanges(rngLabor, rowSum, i) {
         formula: ('SUM(G' + (rowSum + 1) + ':G' + (i - 1) + ')'),
         bold: true
     });
-
-    rngLabor.push({
-        range:[(rowSum + 1) + ':' + (i - 1)],
-        groupByRows: true
-    });
 }
 
 function getExpenseData(data) {
@@ -782,12 +773,14 @@ function getExpenseData(data) {
             (expense.discount == 'T' ? 'Yes' : 'No')
         ]);   
 
-        expenseData.values[expenseData.values.length - 1].push(expense.accountId); // Add account ID for hidden column
-        expenseData.values[expenseData.values.length - 1].push('');
-        expenseData.values[expenseData.values.length - 1].push('');
+        var expenseDataValuesLength = expenseData.values.length;
+
+        expenseData.values[expenseDataValuesLength - 1].push(''); // Add item ID for group control
+        expenseData.values[expenseDataValuesLength - 1].push(expense.accountId); // Add account ID for hidden column
+        expenseData.values[expenseDataValuesLength - 1].push('');
     }
 
-    expenseData.rowLast = expenseData.rowFirst + expenseData.values.length - 2;
+    expenseData.rowLast = expenseData.rowFirst + expenseDataValuesLength - 2;
 
     // Set ranges
 
@@ -797,7 +790,7 @@ function getExpenseData(data) {
             horizontalAlignment: 'center'
         },
         {
-            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'D' + expenseData.rowFirst + ':D' + expenseData.rowLast],
+            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'D' + expenseData.rowFirst + ':D' + expenseData.rowLast,'L' + expenseData.rowFirst + ':M' + expenseData.rowLast],
             color: COLOR_INPUT
         },
         {
@@ -815,6 +808,13 @@ function getExpenseData(data) {
         {
             range: ['G' + expenseData.rowFirst + ':G' + expenseData.rowLast],
             formula: 'A?*F?'
+        },
+        {
+            range: ['M' + expenseData.rowFirst + ':M' + expenseData.rowLast],
+            dataValidationRule: {list: {
+                inCellDropDown: true,
+                source: "Yes,No"
+            }}
         }
     ]);
 
@@ -840,16 +840,16 @@ async function onReload() {
 
 async function onSave() {
 
-    var revisionId = $('#revisionList').val();
+    var quoteId = $('#quoteList').val();
 
-    if (!revisionId) return;
+    if (!quoteId) return;
 
     try {
 
         await Excel.run(async (context) => {
 
             var data = {
-                id: revisionId,
+                id: quoteId,
                 defaultMU: 0,
                 items: [],
                 boms: []
@@ -933,10 +933,10 @@ async function onSave() {
 
                         data.boms[data.boms.length - 1].labor.push({
                             recId: values[13],
-                            groupId: values[14],
+                            sgId: values[14],
                             id: values[15],
                             quantity: values[0],
-                            group: values[1],
+                            sgName: values[1],
                             item: values[2],
                             price: values[3]
                         });
@@ -955,7 +955,7 @@ async function onSave() {
             }
 
             var params = {
-                path: 'revision',
+                path: 'quote',
                 options: {data: data}
             };
 
