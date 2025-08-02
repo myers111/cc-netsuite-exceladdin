@@ -10,7 +10,7 @@ const excel = require('../modules/excel.js');
 const NEW_ITEM = 3757;
 const COLOR_INPUT = '#C6E0B4';
 const LABEL_HEADER = ['Quantity','Item','Description','Cost','Ext. Cost','Quote','Ext. Quote'];
-const LABEL_HEADER_EX = ['Units','Vendor','Manufacturer','MPN','MU%','Discount'];
+const LABEL_HEADER_EX = ['MU%','Discount','Units','Vendor','Manufacturer','MPN'];
 const LABEL_LABOR = 'Labor';
 const LABEL_ITEMS = 'Items';
 const LABEL_EXPENSES = 'Expenses';
@@ -461,19 +461,19 @@ function getItemData(data) {
             }
 
             itemData.ranges.push({
-                range: ['H' + (itemData.rowFirst + i) + ':M' + (itemData.rowFirst + i)],
+                range: ['B' + (itemData.rowFirst + i),'H' + (itemData.rowFirst + i) + ':M' + (itemData.rowFirst + i)],
                 color: COLOR_INPUT
             });
 
             var markup = (item.markup ? parseFloat(item.markup) : 0);
 
             itemData.values[itemDataValuesLength - 1] = itemData.values[itemDataValuesLength - 1].concat([
+                (markup > 0 ? markup : ''),
+                (item.discount == 'T' ? 'Yes' : 'No'),
                 item.units,
                 (item.vendorId ? item.vendor : item.newVendor),
                 item.manufacturer,
-                item.mpn,
-                (markup > 0 ? markup : ''),
-                (item.discount == 'T' ? 'Yes' : 'No')
+                item.mpn
             ]);
         }
 
@@ -488,7 +488,7 @@ function getItemData(data) {
 
     itemData.ranges = itemData.ranges.concat([
         {
-            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'M' + itemData.rowFirst + ':M' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'I' + itemData.rowFirst + ':J' + itemData.rowLast],
             horizontalAlignment: 'center'
         },
         {
@@ -521,7 +521,7 @@ function getItemData(data) {
                 formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
             },
             {
-                range: ['M' + itemData.rowFirst + ':M' + itemData.rowLast],
+                range: ['I' + itemData.rowFirst + ':I' + itemData.rowLast],
                 dataValidationRule: {list: {
                     inCellDropDown: true,
                     source: "Yes,No"
@@ -772,25 +772,22 @@ function getExpenseData(data) {
     
         var expense = data.expenses[i];
 
-        var quantity = (expense.quantity ? parseInt(expense.quantity) : 0);
-        var price = (expense.price ? parseFloat(expense.price) : 0);
         var markup = (expense.markup ? parseFloat(expense.markup) : 0);
-        var defaultMU = (data.defaultMU ? parseFloat(data.defaultMU) : 0);
 
         expenseData.values.push([
-            quantity,
+            expense.quantity,
             '',
             expense.name,
-            price,
+            expense.price,
             0,
             0,
             0,
-            '',
-            '',
-            '',
-            '',
             (markup > 0 ? markup : ''),
-            (expense.discount == 'T' ? 'Yes' : 'No')
+            (expense.discount == 'T' ? 'Yes' : 'No'),
+            '',
+            '',
+            '',
+            ''
         ]);   
 
         var expenseDataValuesLength = expenseData.values.length;
@@ -810,7 +807,7 @@ function getExpenseData(data) {
             horizontalAlignment: 'center'
         },
         {
-            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'D' + expenseData.rowFirst + ':D' + expenseData.rowLast,'L' + expenseData.rowFirst + ':M' + expenseData.rowLast],
+            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'D' + expenseData.rowFirst + ':D' + expenseData.rowLast,'H' + expenseData.rowFirst + ':I' + expenseData.rowLast],
             color: COLOR_INPUT
         },
         {
@@ -830,7 +827,7 @@ function getExpenseData(data) {
             formula: 'A?*F?'
         },
         {
-            range: ['M' + expenseData.rowFirst + ':M' + expenseData.rowLast],
+            range: ['I' + expenseData.rowFirst + ':I' + expenseData.rowLast],
             dataValidationRule: {list: {
                 inCellDropDown: true,
                 source: "Yes,No"
@@ -934,41 +931,38 @@ async function onSave() {
                         else {
 
                             data.boms[data.boms.length - 1].items.push({
-                                id: values[13],
-                                bomId: values[14],
+                                id: values[14],
+                                bomId: values[15],
                                 quantity: values[0],
                                 name: values[1],
                                 description: values[2],
                                 price: values[3],
-                                units: values[7],
-                                vendor: values[8],
-                                manufacturer: values[9],
-                                mpn: values[10],
-                                markUp: values[11],
-                                discount: values[12]
+                                units: values[9],
+                                vendor: values[10],
+                                manufacturer: values[11],
+                                mpn: values[12],
+                                markUp: values[7],
+                                discount: values[8]
                             });
                         }
                     }
                     else if (section == LABEL_LABOR) {
 
                         data.boms[data.boms.length - 1].labor.push({
-                            recId: values[13],
-                            sgId: values[14],
-                            id: values[15],
+                            id: values[14],
+                            sgId: values[15],
                             quantity: values[0],
-                            sgName: values[1],
-                            item: values[2],
                             price: values[3]
                         });
                     }
                     else if (section == LABEL_EXPENSES) {
 
                         data.boms[data.boms.length - 1].expenses.push({
-                            accountId:values[13],
+                            accountId:values[14],
                             quantity: values[1],
                             price: values[3],
-                            markUp: values[11],
-                            discount: values[12]
+                            markUp: values[7],
+                            discount: values[8]
                         });
                     }
                 }
