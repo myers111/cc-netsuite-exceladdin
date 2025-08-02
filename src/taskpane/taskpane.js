@@ -142,13 +142,14 @@ async function onQuote() {
 
             promises.push(addBom({
                 defaultMU: data.defaultMU,
-                bom: data.boms[i]
+                bom: data.boms[i],
+                units: data.units
             }));
         }
 
         await Promise.all(promises);
 
-        //await addSummary(data);
+        await addSummary(data);
     }
 
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
@@ -288,6 +289,7 @@ async function addBom(data) {
         defaultMU: data.defaultMU,
         bomName: data.bom.name,
         items: data.bom.items,
+        units: data.units,
         rowFirst: dataArray.length + 1,
         isSummary: false
     });
@@ -445,6 +447,24 @@ function getItemData(data) {
         }
         else {
 
+            const unit = data.units.find((obj) => obj.type === item.unitsType);
+
+            if (unit) {
+
+                itemData.ranges.push({
+                    range: ['H' + (itemData.rowFirst + i)],
+                    dataValidationRule: {list: {
+                        inCellDropDown: true,
+                        source: unit.names
+                    }}
+                });
+            }
+
+            itemData.ranges.push({
+                range: ['H' + (itemData.rowFirst + i) + ':M' + (itemData.rowFirst + i)],
+                color: COLOR_INPUT
+            });
+
             var markup = (item.markup ? parseFloat(item.markup) : 0);
 
             itemData.values[itemDataValuesLength - 1] = itemData.values[itemDataValuesLength - 1].concat([
@@ -472,7 +492,7 @@ function getItemData(data) {
             horizontalAlignment: 'center'
         },
         {
-            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'C' + itemData.rowFirst + ':C' + itemData.rowLast,'H' + itemData.rowFirst + ':M' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'C' + itemData.rowFirst + ':C' + itemData.rowLast],
             color: COLOR_INPUT
         },
         {
