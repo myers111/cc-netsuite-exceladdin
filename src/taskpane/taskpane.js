@@ -143,7 +143,8 @@ async function onQuote() {
             promises.push(addBom({
                 defaultMU: data.defaultMU,
                 bom: data.boms[i],
-                units: data.units
+                units: data.units,
+                expAccounts: data.expAccounts
             }));
         }
 
@@ -321,6 +322,7 @@ async function addBom(data) {
     var expenseData = getExpenseData({
         defaultMU: data.defaultMU,
         expenses: data.bom.expenses,
+        expAccounts: data.expAccounts,
         rowFirst: dataArray.length + 1,
         isSummary: false
     });
@@ -353,6 +355,14 @@ async function addBom(data) {
             range: ['G' + dataArray.length],
             formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")+SUM(G' + expenseData.rowFirst + ':G' + expenseData.rowLast + ')',
             numberFormat: '$#,###.00'
+        },
+        {
+            range: ['H:J'],
+            horizontalAlignment: 'center'
+        },
+        {
+            range: ['H:H'],
+            numberFormat: '#,###.00%'
         },
         {
             range:['H:M'],
@@ -396,7 +406,7 @@ function getItemData(data) {
         rowLast: 0
     };
 
-    if (!data.isSummary) { itemData.values[0] = itemData.values[0].concat(['','','','','','']); } // Add spaces for extra columns
+    if (!data.isSummary) { itemData.values[0] = itemData.values[0].concat(['','','','','','']); } // Add spaces for extra BOM columns
 
     itemData.values[0] = itemData.values[0].concat(['','','']); // Add spaces for hidden columns
 
@@ -452,7 +462,7 @@ function getItemData(data) {
             if (unit) {
 
                 itemData.ranges.push({
-                    range: ['H' + (itemData.rowFirst + i)],
+                    range: ['J' + (itemData.rowFirst + i)],
                     dataValidationRule: {list: {
                         inCellDropDown: true,
                         source: unit.names
@@ -461,14 +471,12 @@ function getItemData(data) {
             }
 
             itemData.ranges.push({
-                range: ['B' + (itemData.rowFirst + i),'H' + (itemData.rowFirst + i) + ':M' + (itemData.rowFirst + i)],
+                range: ['H' + (itemData.rowFirst + i) + ':M' + (itemData.rowFirst + i)],
                 color: COLOR_INPUT
             });
 
-            var markup = (item.markup ? parseFloat(item.markup) : 0);
-
             itemData.values[itemDataValuesLength - 1] = itemData.values[itemDataValuesLength - 1].concat([
-                (markup > 0 ? markup : ''),
+                (item.markUp > 0 ? item.markUp : ''),
                 (item.discount == 'T' ? 'Yes' : 'No'),
                 item.units,
                 (item.vendorId ? item.vendor : item.newVendor),
@@ -488,7 +496,7 @@ function getItemData(data) {
 
     itemData.ranges = itemData.ranges.concat([
         {
-            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'I' + itemData.rowFirst + ':J' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast],
             horizontalAlignment: 'center'
         },
         {
@@ -498,10 +506,6 @@ function getItemData(data) {
         {
             range: ['D' + itemData.rowFirst + ':G' + itemData.rowLast],
             numberFormat: '$#,###.00'
-        },
-        {
-            range: ['L' + itemData.rowFirst + ':L' + itemData.rowLast],
-            numberFormat: '#,###.00%'
         },
         {
             range: ['E' + itemData.rowFirst + ':E' + itemData.rowLast],
@@ -518,7 +522,7 @@ function getItemData(data) {
         itemData.ranges = itemData.ranges.concat([
             {
                 range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
-                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
+                formula: 'ROUND(D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2)),0)'
             },
             {
                 range: ['I' + itemData.rowFirst + ':I' + itemData.rowLast],
@@ -591,7 +595,15 @@ function getLaborData(data) {
 
             var labor = objLabor[key][i];
 
-            laborData.values.push([labor.quantity,'',labor.name,labor.price,0,0,0]);
+            laborData.values.push([
+                labor.quantity,
+                '',
+                labor.name,
+                labor.price,
+                0,
+                0,
+                0
+            ]);
 
             var laborDataValuesLength = laborData.values.length;
 
@@ -620,12 +632,21 @@ function getLaborData(data) {
             }
             else {
 
-                laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat(['','','','','','']); // Add spaces for extra columns
+                laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat([
+                    (labor.markUp > 0 ? labor.markUp : ''),
+                    (labor.discount == 'T' ? 'Yes' : 'No'),
+                    '',
+                    '',
+                    '',
+                    ''
+                ]);
 
                 laborData.values[laborDataValuesLength - 1].push(''); // Add item ID for group control
                 laborData.values[laborDataValuesLength - 1].push(labor.id); // Add item ID to hidden column
                 laborData.values[laborDataValuesLength - 1].push(labor.sgId); // Add group ID to hidden column
 
+                // Formulas
+                
                 if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
 
                 if (summaryFormulas.labor[key][idString]) {
@@ -662,10 +683,6 @@ function getLaborData(data) {
         {
             range: ['D' + laborData.rowFirst + ':G' + laborData.rowLast],
             numberFormat: '$#,###.00'
-        },
-        {
-            range: [laborData.rowFirst + ':' + laborData.rowLast],
-            groupByRows: true
         }
     ]);
 
@@ -690,13 +707,21 @@ function getLaborData(data) {
             if (!data.isSummary) {
 
                 rngLaborGroup.push({
-                    range: ['A' + i,'D' + i],
+                    range: ['A' + i,'D' + i,'H' + i,'I' + i],
                     color: COLOR_INPUT
                 });
 
                 rngLaborGroup.push({
                     range: ['F' + i],
-                    formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
+                    formula: 'ROUND(D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2)),0)'
+                });
+
+                rngLaborGroup.push({
+                    range: ['I' + i],
+                    dataValidationRule: {list: {
+                        inCellDropDown: true,
+                        source: "Yes,No"
+                    }}
                 });
             }
 
@@ -744,6 +769,11 @@ function setLaborGroupRanges(rngLabor, rowSum, i) {
         formula: ('SUM(G' + (rowSum + 1) + ':G' + (i - 1) + ')'),
         bold: true
     });
+
+    rngLabor.push({
+        range: [(rowSum + 1) + ':' + (i - 1)],
+        groupByRows: true
+    });
 }
 
 function getExpenseData(data) {
@@ -772,8 +802,6 @@ function getExpenseData(data) {
     
         var expense = data.expenses[i];
 
-        var markup = (expense.markup ? parseFloat(expense.markup) : 0);
-
         expenseData.values.push([
             expense.quantity,
             '',
@@ -782,7 +810,7 @@ function getExpenseData(data) {
             0,
             0,
             0,
-            (markup > 0 ? markup : ''),
+            (expense.markUp > 0 ? expense.markUp : ''),
             (expense.discount == 'T' ? 'Yes' : 'No'),
             '',
             '',
@@ -803,7 +831,7 @@ function getExpenseData(data) {
 
     expenseData.ranges = expenseData.ranges.concat([
         {
-            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast,'M' + expenseData.rowFirst + ':M' + expenseData.rowLast],
+            range: ['A' + expenseData.rowFirst + ':A' + expenseData.rowLast],
             horizontalAlignment: 'center'
         },
         {
@@ -813,10 +841,6 @@ function getExpenseData(data) {
         {
             range: ['D' + expenseData.rowFirst + ':G' + expenseData.rowLast],
             numberFormat: '$#,###.00'
-        },
-        {
-            range: ['L' + expenseData.rowFirst + ':L' + expenseData.rowLast],
-            numberFormat: '#,###.00%'
         },
         {
             range: ['E' + expenseData.rowFirst + ':E' + expenseData.rowLast],
@@ -832,7 +856,14 @@ function getExpenseData(data) {
                 inCellDropDown: true,
                 source: "Yes,No"
             }}
-        }
+        }/*,
+        {
+            range: ['C' + expenseData.rowFirst + ':C' + expenseData.rowLast],
+            dataValidationRule: {list: {
+                inCellDropDown: true,
+                source: data.expAccounts.join(',')
+            }}
+        }*/
     ]);
 
     if (!data.isSummary) {
@@ -840,7 +871,7 @@ function getExpenseData(data) {
         expenseData.ranges = expenseData.ranges.concat([
             {
                 range: ['F' + expenseData.rowFirst + ':F' + expenseData.rowLast],
-                formula: 'ROUND(D?*(1+IF(M?="Yes",-1,1)*IF(ISNUMBER(L?),L?,Summary!$G$2)),0)'
+                formula: 'ROUND(D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2)),0)'
             }
         ]);
     }
@@ -948,12 +979,15 @@ async function onSave() {
                     }
                     else if (section == LABEL_LABOR) {
 
-                        data.boms[data.boms.length - 1].labor.push({
-                            id: values[14],
-                            sgId: values[15],
-                            quantity: values[0],
-                            price: values[3]
-                        });
+                        if (values[0] > 0) {
+
+                            data.boms[data.boms.length - 1].labor.push({
+                                id: values[14],
+                                sgId: values[15],
+                                quantity: values[0],
+                                price: values[3]
+                            });
+                        }
                     }
                     else if (section == LABEL_EXPENSES) {
 
