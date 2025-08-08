@@ -924,7 +924,7 @@ async function onSave() {
                 else if (range.values[0][0] != 'Quantity')
                     return;
                 else
-                    data.boms.push({id: WORKSHEET[sheet.id.toString()].bomId, items: [], labor: [], expenses: []});
+                    data.boms.push({id: WORKSHEET[sheet.id.toString()].bomId, items: [], expenses: []});
 
                 var section = '';
      
@@ -968,24 +968,26 @@ async function onSave() {
                                 name: values[1],
                                 description: values[2],
                                 price: values[3],
+                                markUp: values[7],
+                                discount: values[8],
                                 units: values[9],
                                 vendor: values[10],
                                 manufacturer: values[11],
-                                mpn: values[12],
-                                markUp: values[7],
-                                discount: values[8]
+                                mpn: values[12]
                             });
                         }
                     }
                     else if (section == LABEL_LABOR) {
 
-                        if (values[0] > 0) {
+                        if (values[0] > 0 && values[0].length == 0) {
 
-                            data.boms[data.boms.length - 1].labor.push({
+                            data.boms[data.boms.length - 1].items.push({
                                 id: values[14],
                                 sgId: values[15],
                                 quantity: values[0],
-                                price: values[3]
+                                price: values[3],
+                                markUp: values[7],
+                                discount: values[8]
                             });
                         }
                     }
