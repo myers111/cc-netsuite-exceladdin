@@ -49,9 +49,7 @@ module.exports = {
 
                                 if (rangeOptions.formula) {
 
-                                    rangeOptions.formula = rangeOptions.formula.replaceAll('?', (r + rangeProperties.firstRow));
-
-                                    formula.push('=' + rangeOptions.formula);
+                                    formula.push('=' + rangeOptions.formula.replaceAll('?', (r + rangeProperties.firstRow)));
                                 }
 
                                 if (rangeOptions.numberFormat) {

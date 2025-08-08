@@ -150,7 +150,7 @@ async function onQuote() {
 
         await Promise.all(promises);
 
-        await addSummary(data);
+        //await addSummary(data);
     }
 
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
@@ -522,7 +522,7 @@ function getItemData(data) {
         itemData.ranges = itemData.ranges.concat([
             {
                 range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
-                formula: 'ROUND(D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2)),0)'
+                formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
             },
             {
                 range: ['I' + itemData.rowFirst + ':I' + itemData.rowLast],
@@ -713,7 +713,7 @@ function getLaborData(data) {
 
                 rngLaborGroup.push({
                     range: ['F' + i],
-                    formula: 'ROUND(D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2)),0)'
+                    formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
                 });
 
                 rngLaborGroup.push({
@@ -871,7 +871,7 @@ function getExpenseData(data) {
         expenseData.ranges = expenseData.ranges.concat([
             {
                 range: ['F' + expenseData.rowFirst + ':F' + expenseData.rowLast],
-                formula: 'ROUND(D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2)),0)'
+                formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
             }
         ]);
     }
@@ -995,7 +995,8 @@ async function onSave() {
 
                         data.boms[data.boms.length - 1].expenses.push({
                             accountId:values[14],
-                            quantity: values[1],
+                            account:values[2],
+                            quantity: values[0],
                             price: values[3],
                             markUp: values[7],
                             discount: values[8]
