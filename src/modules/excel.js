@@ -10,6 +10,20 @@ module.exports = {
         objExcel = options.excel;
         objGroupbyRows = options.groupByRows;
     },
+    addSummary: async function () {
+    
+        await objExcel.run(async (context) => {
+
+            var sheet = await getSheet(context, 'Summary');
+
+            // G2 must be set to a value since it is referenced in formulas on the BOM's which are created before the Summary
+            // BOM formulas referencing Summary!$G$2 won't work if this isn't done
+
+            sheet.getRange('G2').values = [[0]];
+
+            await context.sync();
+        });
+    },
     addData: async function (sheetName, sheetData, options) {
     
         await objExcel.run(async (context) => {
@@ -97,11 +111,40 @@ module.exports = {
             await context.sync();
         });
     },
-    clearData: async function (sheetName = null) {
+    reset: async function () {
 
         await objExcel.run(async (context) => {
 
-            clear(context, sheetName);
+            let sheets = context.workbook.worksheets;
+    
+            sheets.load("items/name"); // Load the names of all sheets
+
+            await context.sync();
+
+            for (let i = sheets.items.length - 1; i >= 0; i--) {
+
+                let sheet = sheets.items[i];
+console.log('name - ' + sheet.name);
+console.log('length 1 - ' + sheets.items.length);
+                let range = sheet.getRange('A1');
+                    
+                range.load("values");
+
+                await context.sync();
+
+                if (range.values[0] == 'Quote' || range.values[0] == 'Quantity') { // Only act on quote worksheets
+
+                    if (sheets.items.length == 1) { // Ensure at least one visible sheet remains
+
+                        sheets.add().activate(); // Add new worksheet to let Excel name it
+                    }
+
+                    sheet.delete();
+                }
+console.log('length 2 - ' + sheets.items.length);
+            }
+
+            await context.sync();
         });
     }
 };
@@ -163,6 +206,8 @@ async function getSheet(context, sheetName = null) {
             else {
 
                 sheet = context.workbook.worksheets.add(sheetName);
+
+                await context.sync();
             }
         }
         else {

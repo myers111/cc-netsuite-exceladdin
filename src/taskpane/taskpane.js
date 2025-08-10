@@ -101,8 +101,6 @@ function getOptions(id) {
 
 async function onChange(id) {
 
-    await excel.clearData();
-
     switch (id) {
         case 'customer':
             emptyList("project");
@@ -116,6 +114,8 @@ async function onChange(id) {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async function onQuote() {
+
+    await excel.reset();
 
     var quoteId = $('#quoteList').val();
 
@@ -136,6 +136,8 @@ async function onQuote() {
 
         var data = await api.get(params);
 
+        await excel.addSummary();
+
         const promises = [];
 
         for (var i = 0; i < data.boms.length; i++) {
@@ -150,7 +152,7 @@ async function onQuote() {
 
         await Promise.all(promises);
 
-        //await addSummary(data);
+        await addSummary(data);
     }
 
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
@@ -485,7 +487,7 @@ function getItemData(data) {
             ]);
         }
 
-        itemData.values[itemDataValuesLength - 1].push(''); // Add item ID for group control
+        itemData.values[itemDataValuesLength - 1].push(''); // Add space for group control
         itemData.values[itemDataValuesLength - 1].push(item.id); // Add item ID for hidden column
         itemData.values[itemDataValuesLength - 1].push(data.isSummary ? item.bomId  : 0); // Add bom ID for hidden column
     }
@@ -521,15 +523,15 @@ function getItemData(data) {
         
         itemData.ranges = itemData.ranges.concat([
             {
-                range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
-                formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
-            },
-            {
                 range: ['I' + itemData.rowFirst + ':I' + itemData.rowLast],
                 dataValidationRule: {list: {
                     inCellDropDown: true,
                     source: "Yes,No"
                 }}
+            },
+            {
+                range: ['F' + itemData.rowFirst + ':F' + itemData.rowLast],
+                formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
             }
         ]);
     }
@@ -641,7 +643,7 @@ function getLaborData(data) {
                     ''
                 ]);
 
-                laborData.values[laborDataValuesLength - 1].push(''); // Add item ID for group control
+                laborData.values[laborDataValuesLength - 1].push(''); // Add space for group control
                 laborData.values[laborDataValuesLength - 1].push(labor.id); // Add item ID to hidden column
                 laborData.values[laborDataValuesLength - 1].push(labor.sgId); // Add group ID to hidden column
 
@@ -820,7 +822,7 @@ function getExpenseData(data) {
 
         var expenseDataValuesLength = expenseData.values.length;
 
-        expenseData.values[expenseDataValuesLength - 1].push(''); // Add item ID for group control
+        expenseData.values[expenseDataValuesLength - 1].push(''); // Add space for group control
         expenseData.values[expenseDataValuesLength - 1].push(expense.accountId); // Add account ID for hidden column
         expenseData.values[expenseDataValuesLength - 1].push('');
     }
@@ -883,7 +885,7 @@ function getExpenseData(data) {
 
 async function onReload() {
 
-    onRevision();
+    onQuote();
 }
 
 async function onSave() {
