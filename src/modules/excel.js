@@ -115,33 +115,32 @@ module.exports = {
 
         await objExcel.run(async (context) => {
 
+            let sheetsToDelete = [];
+
             let sheets = context.workbook.worksheets;
     
-            sheets.load("items/name"); // Load the names of all sheets
+            sheets.load("items");
 
             await context.sync();
 
-            for (let i = sheets.items.length - 1; i >= 0; i--) {
+            for (let i = 0; i < sheets.items.length; i++) {
 
                 let sheet = sheets.items[i];
-console.log('name - ' + sheet.name);
-console.log('length 1 - ' + sheets.items.length);
+
                 let range = sheet.getRange('A1');
                     
                 range.load("values");
 
                 await context.sync();
 
-                if (range.values[0] == 'Quote' || range.values[0] == 'Quantity') { // Only act on quote worksheets
+                if (range.values[0] == 'Quote' || range.values[0] == 'Quantity') sheetsToDelete.push(sheet) // Only act on quote worksheets
+            }
 
-                    if (sheets.items.length == 1) { // Ensure at least one visible sheet remains
+            if (sheets.items.length == sheetsToDelete.length) sheets.add().activate(); // There must be at least one worksheet. Add new worksheet to let Excel name it
 
-                        sheets.add().activate(); // Add new worksheet to let Excel name it
-                    }
+            for (let i = 0; i < sheetsToDelete.length; i++) {
 
-                    sheet.delete();
-                }
-console.log('length 2 - ' + sheets.items.length);
+                sheetsToDelete[i].delete();
             }
 
             await context.sync();
