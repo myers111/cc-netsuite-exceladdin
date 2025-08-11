@@ -456,6 +456,11 @@ function getItemData(data) {
                     color: COLOR_INPUT
                 });
             }
+
+            itemData.ranges.push({
+                range: ['C' + (itemData.rowFirst + i)],
+                formula: 'TEXTAFTER(CELL("filename",\'' + bomName + '\'!A1),"]")'
+            });
         }
         else {
 
@@ -502,7 +507,7 @@ function getItemData(data) {
             horizontalAlignment: 'center'
         },
         {
-            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast,'C' + itemData.rowFirst + ':C' + itemData.rowLast],
+            range: ['A' + itemData.rowFirst + ':A' + itemData.rowLast],
             color: COLOR_INPUT
         },
         {
@@ -522,6 +527,10 @@ function getItemData(data) {
     if (!data.isSummary) {
         
         itemData.ranges = itemData.ranges.concat([
+            {
+                range: ['C' + itemData.rowFirst + ':C' + itemData.rowLast],
+                color: COLOR_INPUT
+            },
             {
                 range: ['I' + itemData.rowFirst + ':I' + itemData.rowLast],
                 dataValidationRule: {list: {
@@ -926,7 +935,7 @@ async function onSave() {
                 else if (range.values[0][0] != 'Quantity')
                     return;
                 else
-                    data.boms.push({id: WORKSHEET[sheet.id.toString()].bomId, items: [], expenses: []});
+                    data.boms.push({id: WORKSHEET[sheet.id.toString()].bomId, name: sheet.name, items: [], expenses: []});
 
                 var section = '';
      
