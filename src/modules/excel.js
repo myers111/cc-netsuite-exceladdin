@@ -1,18 +1,10 @@
 const { exit } = require("process");
 
-var objExcel = null;
-var objGroupbyRows = null;
-
 module.exports = {
 
-    initialize: async function (options) {
-
-        objExcel = options.excel;
-        objGroupbyRows = options.groupByRows;
-    },
     addSummary: async function () {
     
-        await objExcel.run(async (context) => {
+        await Excel.run(async (context) => {
 
             var sheet = await getSheet(context, 'Summary');
 
@@ -26,7 +18,7 @@ module.exports = {
     },
     addData: async function (sheetName, sheetData, options) {
     
-        await objExcel.run(async (context) => {
+        await Excel.run(async (context) => {
 
             var sheet = await getSheet(context, sheetName);
 
@@ -108,12 +100,14 @@ module.exports = {
                 sheet.getRange(rangeString).format.autofitColumns();
             }
 
+            await sheet.onChanged.add(handleWorksheetChange);
+
             await context.sync();
         });
     },
     reset: async function () {
 
-        await objExcel.run(async (context) => {
+        await Excel.run(async (context) => {
 
             let sheetsToDelete = [];
 
@@ -199,15 +193,13 @@ async function getSheet(context, sheetName = null) {
             if (range.isNullObject) {
 
                 sheet.name = sheetName;
-
-                await context.sync();
             }
             else {
 
                 sheet = context.workbook.worksheets.add(sheetName);
-
-                await context.sync();
             }
+
+            await context.sync();
         }
         else {
 
@@ -224,6 +216,21 @@ async function getSheet(context, sheetName = null) {
     if (sheetName == 'Summary') sheet.position = 0;
 
     return sheet;
+}
+
+async function handleWorksheetChange(eventArgs) {
+
+    console.log('handleWorksheetChange');
+
+    await Excel.run(async (context) => {
+
+        if (eventArgs.changeType === Excel.DataChangeType.rowInserted) {
+
+            console.log("Affected address:", eventArgs.address);
+        }
+
+        await context.sync();
+    });
 }
 
 function getRangeString(options) {
