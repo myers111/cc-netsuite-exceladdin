@@ -132,6 +132,7 @@ async function onQuote() {
         var data = await api.get(params);
 
         await excel.addSummary();
+        await excel.setAccounts(data.expAccounts);
 
         const promises = [];
 
@@ -879,14 +880,7 @@ function getExpenseData(data) {
                 inCellDropDown: true,
                 source: "Yes,No"
             }}
-        }/*,
-        {
-            range: ['C' + expenseData.rowFirst + ':C' + expenseData.rowLast],
-            dataValidationRule: {list: {
-                inCellDropDown: true,
-                source: data.expAccounts.join(',')
-            }}
-        }*/
+        }
     ]);
 
     if (!data.isSummary) {
@@ -982,7 +976,7 @@ async function onSave() {
 
                             data.items.push(item);
                         }
-                        else {
+                        else if (values[4] > 0) {
 
                             data.boms[data.boms.length - 1].items.push({
                                 key: values[14],

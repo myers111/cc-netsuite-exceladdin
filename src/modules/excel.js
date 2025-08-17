@@ -1,5 +1,9 @@
 const { exit } = require("process");
 
+const COLOR_INPUT = '#C6E0B4';
+
+var ACCOUNTS = null;
+
 module.exports = {
 
     addSummary: async function () {
@@ -15,6 +19,10 @@ module.exports = {
 
             await context.sync();
         });
+    },
+    setAccounts: async function (accounts) {
+    
+        ACCOUNTS = accounts;
     },
     addData: async function (sheetName, sheetData, options) {
     
@@ -220,17 +228,107 @@ async function getSheet(context, sheetName = null) {
 
 async function handleWorksheetChange(eventArgs) {
 
-    console.log('handleWorksheetChange');
-
     await Excel.run(async (context) => {
 
         if (eventArgs.changeType === Excel.DataChangeType.rowInserted) {
 
-            console.log("Affected address:", eventArgs.address);
+            var rows = eventArgs.address.split(':'); // This creates a two element array of the first and last rows inserted in string format
+
+            var rowFirst = parseInt(rows[0]);
+            var rowLast = parseInt(rows[1]);
+            
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
+        
+            var range = sheet.getUsedRange();
+
+            range.load("values");
+
+            await context.sync();
+
+            var isSummary = (range.values[0][0] == "Quote");
+            var isExp = false;
+
+            if (isSummary) { // Is Summary
+
+                if (!isItem(range.values, rowFirst)) return;
+            }
+            else if (range.values[0][0] == "Quantity") { // Is BOM
+
+                if (!isItem(range.values, rowFirst)) {
+                    
+                    isExp = isExpense(range.values, rowFirst);
+                    if (!isExpense) return;
+                }
+            }
+            else {
+
+                return;
+            }
+
+            for (var i = rowFirst; i <= rowLast; i++) {
+
+                insertRow(sheet, i, {
+                    isSummary: isSummary,
+                    isExpense: isExp
+                });
+            }
         }
 
         await context.sync();
     });
+}
+
+async function insertRow(sheet, row, options) {
+
+    if (options.isSummary) {
+
+        sheet.getRange('A' + row + ':G' + row).values = [[1,'','',0,0,0,0]];
+
+        sheet.getRange('B' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+    }
+    else {
+
+        if (options.isExpense) {
+            
+            sheet.getRange('A' + row + ':I' + row).values = [[1,'','',0,0,0,0,'','No']];
+
+            var range = sheet.getRange('C' + row);
+            
+            range.format.fill.color = COLOR_INPUT;
+
+            range.dataValidation.rule = {list: {
+                inCellDropDown: true,
+                source: ACCOUNTS.join(',')
+            }}
+        }
+        else {
+
+            sheet.getRange('A' + row + ':J' + row).values = [[1,'','',0,0,0,0,'','No','Ea']];
+
+            sheet.getRange('B' + row).format.fill.color = COLOR_INPUT;
+        }
+    }
+
+    sheet.getRange('E' + row + ':G' + row).formulas = [[('=A?*D?').replaceAll('?', row),('=D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))').replaceAll('?', row),('=A?*F?').replaceAll('?', row)]];
+}
+
+function isItem(values, row) {
+return false;
+    for (var i = row; i > 0; i--) {
+
+        switch (values[i][0]) {
+            case 'Items':
+        }
+    }
+
+    for (var i = rowFirst; i <= rowLast; i++) {
+
+        insertRow(sheet, i, (sheet.name == "Summary"));
+    }
+}
+
+function isExpense(values, row) {
+return true;
 }
 
 function getRangeString(options) {
