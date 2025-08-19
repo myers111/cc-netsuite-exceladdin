@@ -2,12 +2,14 @@ const { exit } = require("process");
 
 const COLOR_INPUT = '#C6E0B4';
 
-var ACCOUNTS = null;
+var LISTS = null;
 
 module.exports = {
 
-    addSummary: async function () {
-    
+    initialize: async function (lists) {
+        
+        LISTS = lists;
+
         await Excel.run(async (context) => {
 
             var sheet = await getSheet(context, 'Summary');
@@ -19,10 +21,6 @@ module.exports = {
 
             await context.sync();
         });
-    },
-    setAccounts: async function (accounts) {
-    
-        ACCOUNTS = accounts;
     },
     addData: async function (sheetName, sheetData, options) {
     
@@ -89,7 +87,7 @@ module.exports = {
 
                         if (rangeOptions.horizontalAlignment) range.format.horizontalAlignment = rangeOptions.horizontalAlignment;
                         if (rangeOptions.bold) range.format.font.bold = true;
-                        if (rangeOptions.groupByRows) range.group(Excel.GroupOption.byRows);
+                        if (rangeOptions.groupByRows) {range.group(Excel.GroupOption.byRows); range.hideGroupDetails();}
                         if (rangeOptions.groupByColumns) range.group(Excel.GroupOption.byColumns);
                         if (rangeOptions.hideRows) range.rowHidden = rangeOptions.hideRows;
                         if (rangeOptions.hideColumns) range.columnHidden = rangeOptions.hideColumns;
@@ -246,18 +244,17 @@ async function handleWorksheetChange(eventArgs) {
             await context.sync();
 
             var isSummary = (range.values[0][0] == "Quote");
-            var isExp = false;
 
             if (isSummary) { // Is Summary
 
-                if (!isItem(range.values, rowFirst)) return;
+                if (!isItem(range.values, isSummary, rowFirst)) return;
             }
             else if (range.values[0][0] == "Quantity") { // Is BOM
 
-                if (!isItem(range.values, rowFirst)) {
+                if (!isItem(range.values, isSummary, rowFirst)) {
                     
-                    isExp = isExpense(range.values, rowFirst);
-                    if (!isExpense) return;
+                    let isExp = isExpense(range.values, rowFirst);
+                    if (!isExp) return;
                 }
             }
             else {
@@ -284,7 +281,7 @@ async function insertRow(sheet, row, options) {
 
         sheet.getRange('A' + row + ':G' + row).values = [[1,'','',0,0,0,0]];
 
-        sheet.getRange('B' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+        sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
     }
     else {
 
@@ -292,43 +289,101 @@ async function insertRow(sheet, row, options) {
             
             sheet.getRange('A' + row + ':I' + row).values = [[1,'','',0,0,0,0,'','No']];
 
-            var range = sheet.getRange('C' + row);
-            
-            range.format.fill.color = COLOR_INPUT;
+            sheet.getRange('A' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('C' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('H' + row + ':I' + row).format.fill.color = COLOR_INPUT;
 
-            range.dataValidation.rule = {list: {
-                inCellDropDown: true,
-                source: ACCOUNTS.join(',')
-            }}
+            sheet.getRange('C' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: LISTS.accounts.join(',')
+                }
+            }
+
+            sheet.getRange('I' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: 'Yes,No'
+                }
+            }
         }
         else {
 
             sheet.getRange('A' + row + ':J' + row).values = [[1,'','',0,0,0,0,'','No','Ea']];
 
-            sheet.getRange('B' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('H' + row + ':M' + row).format.fill.color = COLOR_INPUT;
+
+            sheet.getRange('I' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: 'Yes,No'
+                }
+            }
+
+            sheet.getRange('J' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: LISTS.units.filter(unit => unit.type != 3).map(unit => unit.names).join(',') // Filter out labor units
+                }
+            }
         }
     }
+
+    var range = sheet.getRange('A' + row);
+
+    range.format.horizontalAlignment = 'center';
+    range.format.font.bold = false;
+
+    sheet.getRange('D' + row + ':G' + row).numberFormat = '$#,###.00';
 
     sheet.getRange('E' + row + ':G' + row).formulas = [[('=A?*D?').replaceAll('?', row),('=D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))').replaceAll('?', row),('=A?*F?').replaceAll('?', row)]];
 }
 
-function isItem(values, row) {
-return false;
+function isItem(values, isSummary, row) {
+
     for (var i = row; i > 0; i--) {
 
-        switch (values[i][0]) {
-            case 'Items':
-        }
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != 'Items') return false;
+
+        break;
     }
 
-    for (var i = rowFirst; i <= rowLast; i++) {
+    for (var i = row; i < values.length; i++) {
 
-        insertRow(sheet, i, (sheet.name == "Summary"));
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != (isSummary ? 'Total' : 'Labor')) return false;
+
+        break;
     }
+
+    return true;
 }
 
 function isExpense(values, row) {
-return true;
+
+    for (var i = row; i > 0; i--) {
+
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != 'Expenses') return false;
+
+        break;
+    }
+
+    for (var i = row; i < values.length; i++) {
+
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != 'Total') return false;
+
+        break;
+    }
+
+    return true;
 }
 
 function getRangeString(options) {

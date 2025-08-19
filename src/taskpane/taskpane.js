@@ -131,8 +131,10 @@ async function onQuote() {
 
         var data = await api.get(params);
 
-        await excel.addSummary();
-        await excel.setAccounts(data.expAccounts);
+        await excel.initialize({
+            units: data.units,
+            accounts: data.expAccounts
+        });
 
         const promises = [];
 
