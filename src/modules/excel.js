@@ -28,6 +28,10 @@ module.exports = {
 
             var sheet = await getSheet(context, sheetName);
 
+            // Set column B to text format to preserve leading zero's in item names
+            
+            sheet.getRange('B:B').numberFormat = [['@']];
+
             if (options.bomId) sheetData[sheet.id.toString()] = {bomId: options.bomId};
 
             var rangeString = getRangeString({
@@ -244,16 +248,28 @@ async function handleWorksheetChange(eventArgs) {
             await context.sync();
 
             var isSummary = (range.values[0][0] == "Quote");
+            var isExp = false;
 
             if (isSummary) { // Is Summary
 
-                if (!isItem(range.values, isSummary, rowFirst)) return;
+                if (!isItem(range.values, {
+                    isSummary: true,
+                    rowFirst: rowFirst,
+                    rowLast: rowLast
+                })) return;
             }
             else if (range.values[0][0] == "Quantity") { // Is BOM
 
-                if (!isItem(range.values, isSummary, rowFirst)) {
+                if (!isItem(range.values, {
+                    isSummary: false,
+                    rowFirst: rowFirst,
+                    rowLast: rowLast
+                })) {
                     
-                    let isExp = isExpense(range.values, rowFirst);
+                    isExp = isExpense(range.values, {
+                        rowFirst: rowFirst,
+                        rowLast: rowLast
+                    });
                     if (!isExp) return;
                 }
             }
@@ -340,9 +356,9 @@ async function insertRow(sheet, row, options) {
     sheet.getRange('E' + row + ':G' + row).formulas = [[('=A?*D?').replaceAll('?', row),('=D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))').replaceAll('?', row),('=A?*F?').replaceAll('?', row)]];
 }
 
-function isItem(values, isSummary, row) {
+function isItem(values, params) {
 
-    for (var i = row; i > 0; i--) {
+    for (var i = params.rowFirst - 1; i > 0; i--) {
 
         if (!isNaN(values[i-1][0])) continue;
 
@@ -351,11 +367,11 @@ function isItem(values, isSummary, row) {
         break;
     }
 
-    for (var i = row; i < values.length; i++) {
+    for (var i = params.rowLast + 1; i < values.length; i++) {
 
         if (!isNaN(values[i-1][0])) continue;
 
-        if (values[i-1][0] != (isSummary ? 'Total' : 'Labor')) return false;
+        if (values[i-1][0] != (params.isSummary ? 'Total' : 'Labor')) return false;
 
         break;
     }
@@ -363,9 +379,9 @@ function isItem(values, isSummary, row) {
     return true;
 }
 
-function isExpense(values, row) {
+function isExpense(values, params) {
 
-    for (var i = row; i > 0; i--) {
+    for (var i = params.rowFirst - 1; i > 0; i--) {
 
         if (!isNaN(values[i-1][0])) continue;
 
@@ -374,7 +390,7 @@ function isExpense(values, row) {
         break;
     }
 
-    for (var i = row; i < values.length; i++) {
+    for (var i = params.rowLast + 1; i < values.length; i++) {
 
         if (!isNaN(values[i-1][0])) continue;
 

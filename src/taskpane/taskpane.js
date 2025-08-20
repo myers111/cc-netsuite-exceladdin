@@ -978,7 +978,7 @@ async function onSave() {
 
                             data.items.push(item);
                         }
-                        else if (values[4] > 0) {
+                        else if (values[0] > 0) {
 
                             data.boms[data.boms.length - 1].items.push({
                                 key: values[14],
@@ -988,7 +988,7 @@ async function onSave() {
                                 name: values[1],
                                 description: values[2],
                                 price: values[3],
-                                markUp: values[7],
+                                markUp: values[7] * 100,
                                 discount: values[8],
                                 units: values[9],
                                 vendor: values[10],
@@ -1007,22 +1007,25 @@ async function onSave() {
                                 sgId: values[16],
                                 quantity: values[0],
                                 price: values[3],
-                                markUp: values[7],
+                                markUp: values[7] * 100,
                                 discount: values[8]
                             });
                         }
                     }
                     else if (section == LABEL_EXPENSES) {
 
-                        data.boms[data.boms.length - 1].expenses.push({
-                            key: values[14],
-                            accountId:values[15],
-                            account:values[2],
-                            quantity: values[0],
-                            price: values[3],
-                            markUp: values[7],
-                            discount: values[8]
-                        });
+                        if (values[0] > 0 && values[2].length > 0) {
+
+                            data.boms[data.boms.length - 1].expenses.push({
+                                key: values[14],
+                                accountId:values[15],
+                                account:values[2],
+                                quantity: values[0],
+                                price: values[3],
+                                markUp: values[7] * 100,
+                                discount: values[8]
+                            });
+                        }
                     }
                 }
             }
@@ -1033,6 +1036,8 @@ async function onSave() {
             };
 
             await api.post(params);
+
+            //onReload();
         });
     }
     catch (error) {
