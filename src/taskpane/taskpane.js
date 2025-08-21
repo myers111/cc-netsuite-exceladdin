@@ -988,7 +988,7 @@ async function onSave() {
                                 name: values[1],
                                 description: values[2],
                                 price: values[3],
-                                markUp: values[7] * 100,
+                                markUp: values[7],
                                 discount: values[8],
                                 units: values[9],
                                 vendor: values[10],
@@ -1007,7 +1007,7 @@ async function onSave() {
                                 sgId: values[16],
                                 quantity: values[0],
                                 price: values[3],
-                                markUp: values[7] * 100,
+                                markUp: values[7],
                                 discount: values[8]
                             });
                         }
@@ -1022,7 +1022,7 @@ async function onSave() {
                                 account:values[2],
                                 quantity: values[0],
                                 price: values[3],
-                                markUp: values[7] * 100,
+                                markUp: values[7],
                                 discount: values[8]
                             });
                         }
