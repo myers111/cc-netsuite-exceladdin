@@ -1037,7 +1037,7 @@ async function onSave() {
 
             await api.post(params);
 
-            //onReload();
+            onReload();
         });
     }
     catch (error) {
