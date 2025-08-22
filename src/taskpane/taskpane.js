@@ -241,7 +241,7 @@ async function addSummary(data) {
         },
         {
             range: ['G5'],
-            formula: ('IF($G$' + dataArray.length + '=0,0,$E$5/$G$' + dataArray.length + ')')
+            formula: ('IF($E$' + dataArray.length + '=0,0,$E$5/$E$' + dataArray.length + ')')
         },
         {
             range: ['E6'],
@@ -253,7 +253,7 @@ async function addSummary(data) {
         },
         {
             range: ['G6'],
-            formula: ('IF($G$' + dataArray.length + '=0,0,$E$6/$G$' + dataArray.length + ')')
+            formula: ('IF($E$' + dataArray.length + '=0,0,$E$6/$E$' + dataArray.length + ')')
         },
         {
             range: ['E' + dataArray.length],
