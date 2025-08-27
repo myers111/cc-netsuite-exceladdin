@@ -29,9 +29,14 @@ Office.onReady((info) => {
         document.getElementById("reload").onclick = onReload;
         document.getElementById("save").onclick = onSave;
 
-        initList('customer');
-        initList('project');
-        initList('quote');
+        // The this jQuery function must be used here since the functions being called use jQuery. Otherwise an error occurs.
+            
+        $(document).ready(function() {
+        
+            initList('customer');
+            initList('project');
+            initList('quote');
+        });
     }
 });
 

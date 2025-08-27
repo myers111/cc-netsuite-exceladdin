@@ -55,8 +55,8 @@ async function doFetch(path, options) {
 
     try {
 
-        //const response = await fetch('http://10.0.1.8:8080/api/quoting-excel/' + path, options);
-        const response = await fetch('http://localhost:8080/api/quoting-excel/' + path, options);
+        const response = await fetch('http://10.0.1.8:8080/api/quoting-excel/' + path, options);
+        //const response = await fetch('http://localhost:8080/api/quoting-excel/' + path, options);
 
         const contentType = response.headers.get("content-type");
 
