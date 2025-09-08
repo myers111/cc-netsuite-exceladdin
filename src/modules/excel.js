@@ -1,5 +1,3 @@
-const { exit } = require("process");
-
 const COLOR_INPUT = '#C6E0B4';
 
 var LISTS = null;
@@ -312,7 +310,7 @@ async function insertRow(sheet, row, options) {
             sheet.getRange('C' + row).dataValidation.rule = {
                 list: {
                     inCellDropDown: true,
-                    source: LISTS.accounts.join(',')
+                    source: LISTS.expAccounts.join(',')
                 }
             }
 

@@ -41,3 +41,7 @@ main button,
 main select {
     padding: 3px;
 }
+
+#reload {
+    margin-top: 10px;
+}

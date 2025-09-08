@@ -419,27 +419,7 @@ function getItemData(data) {
 
     itemData.values[0] = itemData.values[0].concat(['','','']); // Add spaces for hidden columns
 
-    if (data.items.length == 0) { // Add empty item
-                
-        data.items.push({
-            key: 0,
-            id: 0,
-            name: '',
-            newItem: '',
-            quantity: 0,
-            units: 'Ea',
-            unitsType: 1,
-            description: '',
-            price: 0,
-            markUp: 0,
-            discount: 'N',
-            vendorId: 0,
-            vendor: '',
-            newVendor: '',
-            manufacturer: '',
-            mpn: ''
-        });
-    }
+    if (data.items.length) {
 
     // Set values
 
@@ -525,6 +505,7 @@ function getItemData(data) {
         itemData.values[itemDataValuesLength - 1].push(item.key); // Add key for hidden column
         itemData.values[itemDataValuesLength - 1].push(item.id); // Add item ID for hidden column
         itemData.values[itemDataValuesLength - 1].push(data.isSummary ? item.bomId  : 0); // Add bom ID for hidden column
+    }
     }
 
     itemData.rowLast = itemData.rowFirst + itemData.values.length - 2;
@@ -847,23 +828,10 @@ function getExpenseData(data) {
     if (!data.isSummary) expenseData.values[0] = expenseData.values[0].concat(['']); // Add space for group control
     expenseData.values[0] = expenseData.values[0].concat(['','','']); // Add spaces for hidden columns
 
-    if (data.expenses.length == 0) { // Add empty expense
-    
-        data.expenses.push({
-            key: 0,
-            accountId: 0,
-            name: '',
-            quantity: 0,
-            price: 0,
-            markUp: 0,
-            discount: 'N'
-        });
-    }
-
     // Set values
 
     for (var i = 0; i < data.expenses.length; i++) {
-        
+    
         var expense = data.expenses[i];
 
         expenseData.values.push([
@@ -879,15 +847,18 @@ function getExpenseData(data) {
             '',
             '',
             '',
-            '',
-            '', // Add space for group control
-            expense.key, // Add key for hidden column
-            expense.accountId, // Add account ID for hidden column
             ''
         ]);   
+
+        var expenseDataValuesLength = expenseData.values.length;
+
+        expenseData.values[expenseDataValuesLength - 1].push(''); // Add space for group control
+        expenseData.values[expenseDataValuesLength - 1].push(expense.key); // Add key for hidden column
+        expenseData.values[expenseDataValuesLength - 1].push(expense.accountId); // Add account ID for hidden column
+        expenseData.values[expenseDataValuesLength - 1].push('');
     }
 
-    expenseData.rowLast = expenseData.rowFirst + expenseData.values.length - 2;
+    expenseData.rowLast = expenseData.rowFirst + expenseDataValuesLength - 2;
 
     // Set ranges
 
