@@ -117,7 +117,7 @@ async function onChange(id) {
 
 async function onQuote() {
 
-    await excel.reset();
+    await reset();
 
     var quoteId = $('#quoteList').val();
 
@@ -163,6 +163,42 @@ async function onQuote() {
     }
 
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
+}
+
+async function reset() {
+
+    await Excel.run(async (context) => {
+
+        let sheetsToDelete = [];
+
+        let sheets = context.workbook.worksheets;
+    
+        sheets.load("items");
+
+        await context.sync();
+
+        for (let i = 0; i < sheets.items.length; i++) {
+
+            let sheet = sheets.items[i];
+
+            let range = sheet.getRange('A1');
+                
+            range.load("values");
+
+            await context.sync();
+
+            if (range.values[0] == 'Quote' || range.values[0] == 'Quantity') sheetsToDelete.push(sheet) // Only act on quote worksheets
+        }
+
+        if (sheets.items.length == sheetsToDelete.length) sheets.add().activate(); // There must be at least one worksheet. Add new worksheet to let Excel name it
+
+        for (let i = 0; i < sheetsToDelete.length; i++) {
+
+            sheetsToDelete[i].delete();
+        }
+
+        await context.sync();
+    });
 }
 
 async function initialize() {
