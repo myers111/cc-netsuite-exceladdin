@@ -3,7 +3,6 @@
  * See LICENSE in the project root for license information.
  */
 
-const { getgid, exit } = require('process');
 const api = require('../modules/api.js');
 const excel = require('../modules/excel.js');
 
@@ -145,7 +144,7 @@ async function onQuote() {
             expAccounts: data.expAccounts
         };
 
-        await excel.initialize(LISTS);
+        await initialize();
 
         const promises = [];
 
@@ -164,6 +163,26 @@ async function onQuote() {
     }
 
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
+}
+
+async function initialize() {
+
+    // G2 must be set to a value since it is referenced in formulas on the BOM's which are created before the Summary
+    // BOM formulas referencing Summary!$G$2 won't work if this isn't done
+
+    await Excel.run(async (context) => {
+
+        var sheet = await excel.getSheet(context, 'Summary');
+
+        await excel.setSheet(context, sheet, {
+            ranges: [
+                {
+                    range: ['G2'],
+                    values: [[0]]
+                }
+            ]
+        });
+    });
 }
 
 async function addSummary(data) {
@@ -214,6 +233,10 @@ async function addSummary(data) {
     dataArray[dataArray.length - 1] = dataArray[dataArray.length - 1].concat(['','','']); // Add spaces for hidden columns
 
     dataRanges = dataRanges.concat([
+        {
+            range: ['B:B'], // Set column B to text format to preserve leading zero's in item names
+            data: [[0]]
+        },
         {
             range: ['G1'],
             formula: '$G$' + dataArray.length,
@@ -277,10 +300,19 @@ async function addSummary(data) {
         }
     ]);
 
-    await excel.addData("Summary", WORKSHEET, {
-        data: dataArray,
-        ranges: dataRanges,
-        autofitColumns: 7
+    await Excel.run(async (context) => {
+
+        var sheet = await excel.getSheet(context, "Summary");
+
+        await excel.setSheet(context, sheet, {
+            data: dataArray,
+            ranges: dataRanges,
+            autofitColumns: 7
+        });
+
+        await sheet.onChanged.add(onWorksheetChange);
+
+        await context.sync();
     });
 }
 
@@ -348,6 +380,10 @@ async function addBom(data) {
 
     dataRanges = dataRanges.concat([
         {
+            range: ['B:B'], // Set column B to text format to preserve leading zero's in item names
+            data: [[0]]
+        },
+        {
             range: ['A1:M1','A' + dataArray.length + ':M' + dataArray.length],
             bold: true
         },
@@ -383,11 +419,21 @@ async function addBom(data) {
         }
     ]);
 
-    await excel.addData(data.bom.name, WORKSHEET, {
-        data: dataArray,
-        ranges: dataRanges,
-        bomId: data.bom.id,
-        autofitColumns: 13
+    await Excel.run(async (context) => {
+
+        var sheet = await excel.getSheet(context, data.bom.name);
+
+        WORKSHEET[sheet.id.toString()] = {bomId: data.bom.id};
+
+        await excel.setSheet(context, sheet, {
+            data: dataArray,
+            ranges: dataRanges,
+            autofitColumns: 13
+        });
+
+        await sheet.onChanged.add(onWorksheetChange);
+
+        await context.sync();
     });
 }
 
@@ -407,7 +453,7 @@ function getItemData(data) {
                 bold: true
             }
         ],
-        rowFirst: data.rowFirst + 1,
+        rowFirst: (data.items.length ? data.rowFirst + 1 : 0),
         rowLast: 0
     };
 
@@ -418,28 +464,6 @@ function getItemData(data) {
     }
 
     itemData.values[0] = itemData.values[0].concat(['','','']); // Add spaces for hidden columns
-
-    if (data.items.length == 0) { // Add empty item
-                
-        data.items.push({
-            key: 0,
-            id: 0,
-            name: '',
-            newItem: '',
-            quantity: 0,
-            units: 'Ea',
-            unitsType: 1,
-            description: '',
-            price: 0,
-            markUp: 0,
-            discount: 'N',
-            vendorId: 0,
-            vendor: '',
-            newVendor: '',
-            manufacturer: '',
-            mpn: ''
-        });
-    }
 
     // Set values
 
@@ -847,23 +871,10 @@ function getExpenseData(data) {
     if (!data.isSummary) expenseData.values[0] = expenseData.values[0].concat(['']); // Add space for group control
     expenseData.values[0] = expenseData.values[0].concat(['','','']); // Add spaces for hidden columns
 
-    if (data.expenses.length == 0) { // Add empty expense
-    
-        data.expenses.push({
-            key: 0,
-            accountId: 0,
-            name: '',
-            quantity: 0,
-            price: 0,
-            markUp: 0,
-            discount: 'N'
-        });
-    }
-
     // Set values
 
     for (var i = 0; i < data.expenses.length; i++) {
-        
+    
         var expense = data.expenses[i];
 
         expenseData.values.push([
@@ -879,15 +890,18 @@ function getExpenseData(data) {
             '',
             '',
             '',
-            '',
-            '', // Add space for group control
-            expense.key, // Add key for hidden column
-            expense.accountId, // Add account ID for hidden column
             ''
         ]);   
+
+        var expenseDataValuesLength = expenseData.values.length;
+
+        expenseData.values[expenseDataValuesLength - 1].push(''); // Add space for group control
+        expenseData.values[expenseDataValuesLength - 1].push(expense.key); // Add key for hidden column
+        expenseData.values[expenseDataValuesLength - 1].push(expense.accountId); // Add account ID for hidden column
+        expenseData.values[expenseDataValuesLength - 1].push('');
     }
 
-    expenseData.rowLast = expenseData.rowFirst + expenseData.values.length - 2;
+    expenseData.rowLast = expenseData.rowFirst + expenseDataValuesLength - 2;
 
     // Set ranges
 
@@ -932,6 +946,182 @@ function getExpenseData(data) {
     }
 
     return expenseData;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async function onWorksheetChange(eventArgs) {
+
+    await Excel.run(async (context) => {
+
+        if (eventArgs.changeType === Excel.DataChangeType.rowInserted) {
+
+            var rows = eventArgs.address.split(':'); // This creates a two element array of the first and last rows inserted in string format
+
+            var rowFirst = parseInt(rows[0]);
+            var rowLast = parseInt(rows[1]);
+            
+            var sheet = context.workbook.worksheets.getActiveWorksheet();
+        
+            var range = sheet.getUsedRange();
+
+            range.load("values");
+
+            await context.sync();
+
+            var isSummary = (range.values[0][0] == "Quote");
+            var isExp = false;
+
+            if (isSummary) { // Is Summary
+
+                if (!isItem(range.values, {
+                    isSummary: true,
+                    rowFirst: rowFirst,
+                    rowLast: rowLast
+                })) return;
+            }
+            else if (range.values[0][0] == "Quantity") { // Is BOM
+
+                if (!isItem(range.values, {
+                    isSummary: false,
+                    rowFirst: rowFirst,
+                    rowLast: rowLast
+                })) {
+                    
+                    isExp = isExpense(range.values, {
+                        rowFirst: rowFirst,
+                        rowLast: rowLast
+                    });
+                    if (!isExp) return;
+                }
+            }
+            else {
+
+                return;
+            }
+
+            for (var i = rowFirst; i <= rowLast; i++) {
+
+                insertRow(sheet, i, {
+                    isSummary: isSummary,
+                    isExpense: isExp
+                });
+            }
+        }
+
+        await context.sync();
+    });
+}
+
+async function insertRow(sheet, row, options) {
+
+    if (options.isSummary) {
+
+        sheet.getRange('A' + row + ':G' + row).values = [[1,'','',0,0,0,0]];
+
+        sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+    }
+    else {
+
+        if (options.isExpense) {
+            
+            sheet.getRange('A' + row + ':I' + row).values = [[1,'','',0,0,0,0,'','No']];
+
+            sheet.getRange('A' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('C' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('H' + row + ':I' + row).format.fill.color = COLOR_INPUT;
+
+            sheet.getRange('C' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: LISTS.expAccounts.join(',')
+                }
+            }
+
+            sheet.getRange('I' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: 'Yes,No'
+                }
+            }
+        }
+        else {
+
+            sheet.getRange('A' + row + ':J' + row).values = [[1,'','',0,0,0,0,'','No','Ea']];
+
+            sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+            sheet.getRange('H' + row + ':M' + row).format.fill.color = COLOR_INPUT;
+
+            sheet.getRange('I' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: 'Yes,No'
+                }
+            }
+
+            sheet.getRange('J' + row).dataValidation.rule = {
+                list: {
+                    inCellDropDown: true,
+                    source: LISTS.units.filter(unit => unit.type != 3).map(unit => unit.names).join(',') // Filter out labor units
+                }
+            }
+        }
+    }
+
+    var range = sheet.getRange('A' + row);
+
+    range.format.horizontalAlignment = 'center';
+    range.format.font.bold = false;
+
+    sheet.getRange('D' + row + ':G' + row).numberFormat = '$#,###.00';
+
+    sheet.getRange('E' + row + ':G' + row).formulas = [[('=A?*D?').replaceAll('?', row),('=D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))').replaceAll('?', row),('=A?*F?').replaceAll('?', row)]];
+}
+
+function isItem(values, params) {
+
+    for (var i = params.rowFirst - 1; i > 0; i--) {
+
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != 'Items') return false;
+
+        break;
+    }
+
+    for (var i = params.rowLast + 1; i < values.length; i++) {
+
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != (params.isSummary ? 'Total' : 'Labor')) return false;
+
+        break;
+    }
+
+    return true;
+}
+
+function isExpense(values, params) {
+
+    for (var i = params.rowFirst - 1; i > 0; i--) {
+
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != 'Expenses') return false;
+
+        break;
+    }
+
+    for (var i = params.rowLast + 1; i < values.length; i++) {
+
+        if (!isNaN(values[i-1][0])) continue;
+
+        if (values[i-1][0] != 'Total') return false;
+
+        break;
+    }
+
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

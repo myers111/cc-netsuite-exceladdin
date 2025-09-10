@@ -419,8 +419,6 @@ function getItemData(data) {
 
     itemData.values[0] = itemData.values[0].concat(['','','']); // Add spaces for hidden columns
 
-    if (data.items.length) {
-
     // Set values
 
     for (var i = 0; i < data.items.length; i++) {
@@ -505,7 +503,6 @@ function getItemData(data) {
         itemData.values[itemDataValuesLength - 1].push(item.key); // Add key for hidden column
         itemData.values[itemDataValuesLength - 1].push(item.id); // Add item ID for hidden column
         itemData.values[itemDataValuesLength - 1].push(data.isSummary ? item.bomId  : 0); // Add bom ID for hidden column
-    }
     }
 
     itemData.rowLast = itemData.rowFirst + itemData.values.length - 2;
