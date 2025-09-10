@@ -972,6 +972,8 @@ async function onWorksheetChange(eventArgs) {
             var isSummary = (range.values[0][0] == "Quote");
             var isExp = false;
 
+            var values = null;
+
             if (isSummary) { // Is Summary
 
                 if (!isItem(range.values, {
@@ -979,20 +981,28 @@ async function onWorksheetChange(eventArgs) {
                     rowFirst: rowFirst,
                     rowLast: rowLast
                 })) return;
+
+                values = [[1,'','',0,0,0,0]];
             }
             else if (range.values[0][0] == "Quantity") { // Is BOM
 
-                if (!isItem(range.values, {
+                if (isItem(range.values, {
                     isSummary: false,
                     rowFirst: rowFirst,
                     rowLast: rowLast
                 })) {
                     
+                    values = [[1,'','',0,0,0,0,'','No','Ea']];
+                }
+                else {
+
                     isExp = isExpense(range.values, {
                         rowFirst: rowFirst,
                         rowLast: rowLast
                     });
                     if (!isExp) return;
+                    
+                    values = [[1,'','',0,0,0,0,'','No']];
                 }
             }
             else {
@@ -1002,7 +1012,7 @@ async function onWorksheetChange(eventArgs) {
 
             for (var i = rowFirst; i <= rowLast; i++) {
 
-                insertRow(sheet, i, {
+                insertRow(sheet, i, values, {
                     isSummary: isSummary,
                     isExpense: isExp
                 });
@@ -1013,11 +1023,11 @@ async function onWorksheetChange(eventArgs) {
     });
 }
 
-async function insertRow(sheet, row, options) {
+async function insertRow(sheet, row, values, options) {
 
     if (options.isSummary) {
 
-        sheet.getRange('A' + row + ':G' + row).values = [[1,'','',0,0,0,0]];
+        sheet.getRange('A' + row + ':G' + row).values = values;
 
         sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
     }
@@ -1025,7 +1035,7 @@ async function insertRow(sheet, row, options) {
 
         if (options.isExpense) {
             
-            sheet.getRange('A' + row + ':I' + row).values = [[1,'','',0,0,0,0,'','No']];
+            sheet.getRange('A' + row + ':I' + row).values = values;
 
             sheet.getRange('A' + row).format.fill.color = COLOR_INPUT;
             sheet.getRange('C' + row + ':D' + row).format.fill.color = COLOR_INPUT;
@@ -1047,7 +1057,7 @@ async function insertRow(sheet, row, options) {
         }
         else {
 
-            sheet.getRange('A' + row + ':J' + row).values = [[1,'','',0,0,0,0,'','No','Ea']];
+            sheet.getRange('A' + row + ':J' + row).values = values;
 
             sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
             sheet.getRange('H' + row + ':M' + row).format.fill.color = COLOR_INPUT;
