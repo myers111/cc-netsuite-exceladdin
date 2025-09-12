@@ -341,7 +341,7 @@ async function addSummary(data) {
         var sheet = await excel.getSheet(context, "Summary");
 
         await excel.setSheet(context, sheet, {
-            data: dataArray,
+            values: dataArray,
             ranges: dataRanges,
             autofitColumns: 7
         });
@@ -462,7 +462,7 @@ async function addBom(data) {
         WORKSHEET[sheet.id.toString()] = {bomId: data.bom.id};
 
         await excel.setSheet(context, sheet, {
-            data: dataArray,
+            values: dataArray,
             ranges: dataRanges,
             autofitColumns: 13
         });
@@ -994,134 +994,99 @@ async function onWorksheetChange(eventArgs) {
 
             var rows = eventArgs.address.split(':'); // This creates a two element array of the first and last rows inserted in string format
 
-            var rowFirst = parseInt(rows[0]);
-            var rowLast = parseInt(rows[1]);
-            
             var sheet = context.workbook.worksheets.getActiveWorksheet();
-        
+
             var range = sheet.getUsedRange();
 
             range.load("values");
 
             await context.sync();
 
-            var isSummary = (range.values[0][0] == "Quote");
-            var isExp = false;
+            var rowFirst = parseInt(rows[0]);
+            var rowLast = parseInt(rows[1]);
+            
+            var type = getType(range.values, {
+                rowFirst: rowFirst,
+                rowLast: rowLast
+            });
 
-            var values = null;
-
-            if (isSummary) { // Is Summary
-
-                if (!isItem(range.values, {
-                    isSummary: true,
-                    rowFirst: rowFirst,
-                    rowLast: rowLast
-                })) return;
-
-                values = [[1,'','',0,0,0,0]];
-            }
-            else if (range.values[0][0] == "Quantity") { // Is BOM
-
-                if (isItem(range.values, {
-                    isSummary: false,
-                    rowFirst: rowFirst,
-                    rowLast: rowLast
-                })) {
-                    
-                    values = [[1,'','',0,0,0,0,'','No','Ea']];
-                }
-                else {
-
-                    isExp = isExpense(range.values, {
-                        rowFirst: rowFirst,
-                        rowLast: rowLast
-                    });
-                    if (!isExp) return;
-                    
-                    values = [[1,'','',0,0,0,0,'','No']];
-                }
-            }
-            else {
-
-                return;
-            }
+            var ranges = [];
 
             for (var i = rowFirst; i <= rowLast; i++) {
 
-                insertRow(sheet, i, values, {
-                    isSummary: isSummary,
-                    isExpense: isExp
-                });
-            }
-        }
+                if (type.isItem) {
 
-        await context.sync();
+                    if (type.isSummary) {
+
+                        ranges = ranges.concat([{
+                            range: ['A' + i + ':G' + i],
+                            values: [[1,'','',0,0,0,0]]
+                        }]);
+                    }
+                    else {
+
+                        ranges = ranges.concat([{
+                            range: ['A' + i + ':J' + i],
+                            values: [[1,'','',0,0,0,0,'','No','Ea']]
+                        }]);
+                    }
+                }
+                else if (type.isExpense) {
+
+                    ranges = ranges.concat([{
+                        range: ['A' + i + ':I' + i],
+                        values: [[1,'','',0,0,0,0,'','No']]
+                    }]);
+                }
+
+                var rowRanges = getRowRanges(i, type);
+
+                if (rowRanges.length) ranges = ranges.concat(rowRanges);
+            }
+
+            await excel.setSheet(context, sheet, {
+                ranges: ranges
+            });
+
+            await context.sync();
+        }
     });
 }
 
-async function insertRow(sheet, row, values, options) {
+function getType(values, options) {
 
-    if (options.isSummary) {
+    var type = {
+        isSummary: (values[0][0] == "Quote"),
+        isItem: false,
+        isExpense: false
+    };
 
-        sheet.getRange('A' + row + ':G' + row).values = values;
+    if (type.isSummary) { // Is Summary
 
-        sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
+        type.isItem = isItem(values, {
+            isSummary: true,
+            rowFirst: options.rowFirst,
+            rowLast: options.rowLast
+        });
     }
-    else {
+    else if (values[0][0] == "Quantity") { // Is BOM
 
-        if (options.isExpense) {
-            
-            sheet.getRange('A' + row + ':I' + row).values = values;
+        type.isItem = isItem(values, {
+            isSummary: false,
+            rowFirst: options.rowFirst,
+            rowLast: options.rowLast
+        });
+        
+        if (!type.isItem) {
 
-            sheet.getRange('A' + row).format.fill.color = COLOR_INPUT;
-            sheet.getRange('C' + row + ':D' + row).format.fill.color = COLOR_INPUT;
-            sheet.getRange('H' + row + ':I' + row).format.fill.color = COLOR_INPUT;
-
-            sheet.getRange('C' + row).dataValidation.rule = {
-                list: {
-                    inCellDropDown: true,
-                    source: LISTS.expAccounts.join(',')
-                }
-            }
-
-            sheet.getRange('I' + row).dataValidation.rule = {
-                list: {
-                    inCellDropDown: true,
-                    source: 'Yes,No'
-                }
-            }
-        }
-        else {
-
-            sheet.getRange('A' + row + ':J' + row).values = values;
-
-            sheet.getRange('A' + row + ':D' + row).format.fill.color = COLOR_INPUT;
-            sheet.getRange('H' + row + ':M' + row).format.fill.color = COLOR_INPUT;
-
-            sheet.getRange('I' + row).dataValidation.rule = {
-                list: {
-                    inCellDropDown: true,
-                    source: 'Yes,No'
-                }
-            }
-
-            sheet.getRange('J' + row).dataValidation.rule = {
-                list: {
-                    inCellDropDown: true,
-                    source: LISTS.units.filter(unit => unit.type != 3).map(unit => unit.names).join(',') // Filter out labor units
-                }
-            }
+            type.isExpense = isExpense(values, {
+                rowFirst: options.rowFirst,
+                rowLast: options.rowLast
+            });
         }
     }
 
-    var range = sheet.getRange('A' + row);
-
-    range.format.horizontalAlignment = 'center';
-    range.format.font.bold = false;
-
-    sheet.getRange('D' + row + ':G' + row).numberFormat = '$#,###.00';
-
-    sheet.getRange('E' + row + ':G' + row).formulas = [[('=A?*D?').replaceAll('?', row),('=D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))').replaceAll('?', row),('=A?*F?').replaceAll('?', row)]];
+    return  type;
 }
 
 function isItem(values, params) {
@@ -1168,6 +1133,102 @@ function isExpense(values, params) {
     }
 
     return true;
+}
+
+function getRowRanges(row, type) {
+
+    if (type.isItem) {
+
+        if (type.isSummary) {
+
+            return [
+                {
+                    range: ['A' + row + ':D' + row],
+                    color: COLOR_INPUT
+                }
+            ];
+        }
+        else {
+
+            return [
+                {
+                    range: ['A' + row + ':D' + row,'H' + row + ':M' + row],
+                    color: COLOR_INPUT
+                },
+                {
+                    range: ['A' + row],
+                    horizontalAlignment: 'center'
+                },
+                {
+                    range: ['A' + row],
+                    bold: false
+                },
+                {
+                    range: ['D' + row + ':G' + row],
+                    numberFormat: '$#,###.00'
+                },
+                {
+                    range: ['E' + row],
+                    formula: 'A?*D?'
+                },
+                {
+                    range: ['F' + row],
+                    formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
+                },
+                {
+                    range: ['G' + row],
+                    formula: 'A?*F?'
+                },
+                {
+                    range: ['J' + row],
+                    dataValidationRule: {
+                        list: {
+                            inCellDropDown: true,
+                            source: LISTS.units.filter(unit => unit.type != 3).map(unit => unit.names).join(',') // Filter out labor units
+                        }
+                    }
+                },
+                {
+                    range: ['I' + row],
+                    dataValidationRule: {
+                        list: {
+                            inCellDropDown: true,
+                            source: "Yes,No"
+                        }
+                    }
+                }
+            ];
+        }
+    }
+    else if (type.isExpense) {
+
+        return [
+            {
+                range: ['A' + row,'C' + row + ':D' + row,'H' + row + ':I' + row],
+                color: COLOR_INPUT
+            },
+            {
+                range: ['C' + row],
+                dataValidationRule: {
+                    list: {
+                        inCellDropDown: true,
+                        source: LISTS.expAccounts.join(',')
+                    }
+                }
+            },
+            {
+                range: ['I' + row],
+                dataValidationRule: {
+                    list: {
+                        inCellDropDown: true,
+                        source: "Yes,No"
+                    }
+                }
+            }
+        ];
+    }
+
+    return [];
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

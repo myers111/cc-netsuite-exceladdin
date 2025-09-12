@@ -51,14 +51,14 @@ module.exports = {
     },
     setSheet: async function (context, sheet, options) {
 
-        if (options.data) {
+        if (options.values) {
 
             var rangeString = getRangeString({
-                rows: options.data.length,
-                columns: options.data[0].length
+                rows: options.values.length,
+                columns: options.values[0].length
             });
 
-            sheet.getRange(rangeString).values = options.data;
+            sheet.getRange(rangeString).values = options.values;
         }
 
         if (options.ranges) {
