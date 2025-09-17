@@ -51,14 +51,14 @@ module.exports = {
     },
     setSheet: async function (context, sheet, options) {
 
-        if (options.values) {
+        if (options.data) {
 
             var rangeString = getRangeString({
-                rows: options.values.length,
-                columns: options.values[0].length
+                rows: options.data.length,
+                columns: options.data[0].length
             });
 
-            sheet.getRange(rangeString).values = options.values;
+            sheet.getRange(rangeString).values = options.data;
         }
 
         if (options.ranges) {
@@ -125,6 +125,41 @@ module.exports = {
         }
 
         await context.sync();
+    },
+    reset: async function () {
+
+        await Excel.run(async (context) => {
+
+            let sheetsToDelete = [];
+
+            let sheets = context.workbook.worksheets;
+    
+            sheets.load("items");
+
+            await context.sync();
+
+            for (let i = 0; i < sheets.items.length; i++) {
+
+                let sheet = sheets.items[i];
+
+                let range = sheet.getRange('A1');
+                    
+                range.load("values");
+
+                await context.sync();
+
+                if (range.values[0] == 'Quote' || range.values[0] == 'Quantity') sheetsToDelete.push(sheet) // Only act on quote worksheets
+            }
+
+            if (sheets.items.length == sheetsToDelete.length) sheets.add().activate(); // There must be at least one worksheet. Add new worksheet to let Excel name it
+
+            for (let i = 0; i < sheetsToDelete.length; i++) {
+
+                sheetsToDelete[i].delete();
+            }
+
+            await context.sync();
+        });
     }
 };
 
