@@ -305,27 +305,27 @@ async function addSummary(data) {
             range: ['G5'],
             formula: ('IF($E$' + dataArray.length + '=0,0,$E$5/$E$' + dataArray.length + ')')
         },
-/*        {
+        {
             range: ['E6'],
-            formula: 'SUMIFS(E' + laborData.rowFirst + ':E' + laborData.rowLast + ',D' + laborData.rowFirst + ':D' + laborData.rowLast + ',"<>")'
+            formula: 'SUMIFS(E' + (laborData.rowFirst + 1) + ':E' + laborData.rowLast + ',D' + (laborData.rowFirst + 1) + ':D' + laborData.rowLast + ',"<>")'
         },
         {
             range: ['F6'],
-            formula: 'SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")'
+            formula: 'SUMIFS(G' + (laborData.rowFirst + 1) + ':G' + laborData.rowLast + ',F' + (laborData.rowFirst + 1) + ':F' + laborData.rowLast + ',"<>")'
         },
-*/        {
+        {
             range: ['G6'],
             formula: ('IF($E$' + dataArray.length + '=0,0,$E$6/$E$' + dataArray.length + ')')
         },
-/*        {
+        {
             range: ['E' + dataArray.length],
-            formula: 'SUM(E' + itemData.rowFirst + ':E' + itemData.rowLast + ')'
+            formula: 'SUM(E' + (itemData.rowFirst + 1) + ':E' + itemData.rowLast + ')'
         },
         {
             range: ['G' + dataArray.length],
-            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')'
+            formula: 'SUM(G' + (itemData.rowFirst + 1) + ':G' + itemData.rowLast + ')'
         },
-*/        {
+        {
             range:['H:J'],
             hideColumns: true
         }
@@ -405,17 +405,17 @@ async function addBom(data) {
             range: ['A1:M1','A' + dataArray.length + ':M' + dataArray.length],
             bold: true
         },
-/*        {
+        {
             range: ['E' + dataArray.length],
-            formula: 'SUM(E' + itemData.rowFirst + ':E' + itemData.rowLast + ')+SUMIFS(E' + laborData.rowFirst + ':E' + laborData.rowLast + ',D' + laborData.rowFirst + ':D' + laborData.rowLast + ',"<>")+SUM(E' + expenseData.rowFirst + ':E' + expenseData.rowLast + ')',
+            formula: 'SUM(E' + (itemData.rowFirst + 1) + ':E' + itemData.rowLast + ')+SUMIFS(E' + (laborData.rowFirst + 1) + ':E' + laborData.rowLast + ',D' + (laborData.rowFirst + 1) + ':D' + laborData.rowLast + ',"<>")+SUM(E' + (expenseData.rowFirst + 1) + ':E' + expenseData.rowLast + ')',
             numberFormat: '$#,###.00'
         },
         {
             range: ['G' + dataArray.length],
-            formula: 'SUM(G' + itemData.rowFirst + ':G' + itemData.rowLast + ')+SUMIFS(G' + laborData.rowFirst + ':G' + laborData.rowLast + ',F' + laborData.rowFirst + ':F' + laborData.rowLast + ',"<>")+SUM(G' + expenseData.rowFirst + ':G' + expenseData.rowLast + ')',
+            formula: 'SUM(G' + (itemData.rowFirst + 1) + ':G' + itemData.rowLast + ')+SUMIFS(G' + (laborData.rowFirst + 1) + ':G' + laborData.rowLast + ',F' + (laborData.rowFirst + 1) + ':F' + laborData.rowLast + ',"<>")+SUM(G' + (expenseData.rowFirst + 1) + ':G' + expenseData.rowLast + ')',
             numberFormat: '$#,###.00'
         },
-*/        {
+        {
             range:['H:M'],
             groupByColumns: true
         },
