@@ -66,7 +66,7 @@ module.exports = {
             for (var i = 0; i < options.ranges.length; i++) {
 
                 var rangeOptions = options.ranges[i];
-
+console.log(JSON.stringify(rangeOptions));
                 for (var j = 0; j < rangeOptions.range.length; j++) {
     
                     var range = sheet.getRange(rangeOptions.range[j]);
@@ -104,7 +104,7 @@ module.exports = {
 
                     if (rangeOptions.values) range.values = rangeOptions.values;
                     if (rangeOptions.horizontalAlignment) range.format.horizontalAlignment = rangeOptions.horizontalAlignment;
-                    if (rangeOptions.bold) range.format.font.bold = true;
+                    if (rangeOptions.bold != null) range.format.font.bold = rangeOptions.bold;
                     if (rangeOptions.groupByRows) {range.group(Excel.GroupOption.byRows); range.hideGroupDetails();}
                     if (rangeOptions.groupByColumns) range.group(Excel.GroupOption.byColumns);
                     if (rangeOptions.hideRows) range.rowHidden = rangeOptions.hideRows;

@@ -318,18 +318,16 @@ async function addSummary(data) {
             formula: ('IF($E$' + dataArray.length + '=0,0,$E$6/$E$' + dataArray.length + ')')
         },
         {
-            range: ['E' + dataArray.length],
-            formula: 'SUM(E' + (itemData.rowFirst + 1) + ':E' + itemData.rowLast + ')'
-        },
-        {
-            range: ['G' + dataArray.length],
-            formula: 'SUM(G' + (itemData.rowFirst + 1) + ':G' + itemData.rowLast + ')'
-        },
-        {
             range:['H:J'],
             hideColumns: true
         }
     ]);
+
+    dataRanges = dataRanges.concat(getTotalRowRanges(true, {
+        row: dataArray.length,
+        itemRowFirst: itemData.rowFirst,
+        itemRowLast: itemData.rowLast
+    }));
 
     await Excel.run(async (context) => {
 
@@ -406,16 +404,6 @@ async function addBom(data) {
             bold: true
         },
         {
-            range: ['E' + dataArray.length],
-            formula: 'SUM(E' + (itemData.rowFirst + 1) + ':E' + itemData.rowLast + ')+SUMIFS(E' + (laborData.rowFirst + 1) + ':E' + laborData.rowLast + ',D' + (laborData.rowFirst + 1) + ':D' + laborData.rowLast + ',"<>")+SUM(E' + (expenseData.rowFirst + 1) + ':E' + expenseData.rowLast + ')',
-            numberFormat: '$#,###.00'
-        },
-        {
-            range: ['G' + dataArray.length],
-            formula: 'SUM(G' + (itemData.rowFirst + 1) + ':G' + itemData.rowLast + ')+SUMIFS(G' + (laborData.rowFirst + 1) + ':G' + laborData.rowLast + ',F' + (laborData.rowFirst + 1) + ':F' + laborData.rowLast + ',"<>")+SUM(G' + (expenseData.rowFirst + 1) + ':G' + expenseData.rowLast + ')',
-            numberFormat: '$#,###.00'
-        },
-        {
             range:['H:M'],
             groupByColumns: true
         },
@@ -428,6 +416,16 @@ async function addBom(data) {
             columnWidth: 15
         }
     ]);
+
+    dataRanges = dataRanges.concat(getTotalRowRanges(false, {
+        row: dataArray.length,
+        itemRowFirst: itemData.rowFirst,
+        itemRowLast: itemData.rowLast,
+        laborRowFirst: laborData.rowFirst,
+        laborRowLast: laborData.rowLast,
+        expenseRowFirst: expenseData.rowFirst,
+        expenseRowLast: expenseData.rowLast
+    }));
 
     await Excel.run(async (context) => {
 
@@ -775,6 +773,8 @@ async function onWorksheetChange(eventArgs) {
                 rowLast: rowLast
             });
 
+            type['isInsert'] = true;
+
             var ranges = [];
 
             for (var i = rowFirst; i <= rowLast; i++) {
@@ -808,6 +808,8 @@ async function onWorksheetChange(eventArgs) {
 
                 if (rowRanges.length) ranges = ranges.concat(rowRanges);
             }
+
+            ranges = ranges.concat(getTotalRowRanges(type.isSummary));
 
             await excel.setSheet(context, sheet, {
                 ranges: ranges
@@ -909,7 +911,8 @@ function getRowRanges(row, type) {
         {
             range: ['A' + row],
             color: (type.isSummary && type.isLabor ? '' : COLOR_INPUT),
-            horizontalAlignment: 'center'
+            horizontalAlignment: 'center',
+            bold: false
         },
         {
             range: ['D' + row + ':G' + row],
@@ -1002,6 +1005,16 @@ function getRowRanges(row, type) {
         }
         else {
 
+            if (type.isInsert) {
+
+                ranges = ranges.concat([
+                    {
+                        range: ['B' + row + ':C' + row],
+                        color: COLOR_INPUT
+                    }
+                ]);
+            }
+
             ranges = ranges.concat([
                 {
                     range: ['K' + row + ':M' + row],
@@ -1042,17 +1055,24 @@ function getRowRanges(row, type) {
     }
     else if (type.isExpense) {
 
-        ranges = ranges.concat([
-            {
-                range: ['C' + row],
-                dataValidationRule: {
-                    list: {
-                        inCellDropDown: true,
-                        source: LISTS.expAccounts.join(',')
+        if (type.isInsert) {
+
+            ranges = ranges.concat([
+                {
+                    range: ['C' + row],
+                    color: COLOR_INPUT
+                },
+                {
+                    range: ['C' + row],
+                    dataValidationRule: {
+                        list: {
+                            inCellDropDown: true,
+                            source: LISTS.expAccounts.join(',')
+                        }
                     }
                 }
-            }
-        ]);
+            ]);
+        }
     }
 
     return ranges;
@@ -1095,6 +1115,54 @@ function getGroupRowRanges(row, type) {
                 }
             ]);
         }
+    }
+
+    return ranges;
+}
+
+function getTotalRowRanges(isSummary, rows = null) {
+
+    var ranges = [];
+
+    if (isSummary) {
+
+        if (!rows) {
+
+            rows = {
+                
+            };
+        }
+
+        ranges = [
+            {
+                range: ['E' + rows.row],
+                formula: 'SUM(E' + (rows.itemRowFirst + 1) + ':E' + rows.itemRowLast + ')'
+            },
+            {
+                range: ['G' + rows.row],
+                formula: 'SUM(G' + (rows.itemRowFirst + 1) + ':G' + rows.itemRowLast + ')'
+            },
+        ];
+    }
+    else  {
+
+        if (!rows) {
+
+            rows = {
+                
+            };
+        }
+
+        ranges = [
+            {
+                range: ['E' + rows.row],
+                formula: 'SUM(E' + (rows.itemRowFirst + 1) + ':E' + rows.itemRowLast + ')+SUMIFS(E' + (rows.laborRowFirst + 1) + ':E' + rows.laborRowLast + ',D' + (rows.laborRowFirst + 1) + ':D' + rows.laborRowLast + ',"<>")+SUM(E' + (rows.expenseRowFirst + 1) + ':E' + rows.expenseRowLast + ')',
+            },
+            {
+                range: ['G' + rows.row],
+                formula: 'SUM(G' + (rows.itemRowFirst + 1) + ':G' + rows.itemRowLast + ')+SUMIFS(G' + (rows.laborRowFirst + 1) + ':G' + rows.laborRowLast + ',F' + (rows.laborRowFirst + 1) + ':F' + rows.laborRowLast + ',"<>")+SUM(G' + (rows.expenseRowFirst + 1) + ':G' + rows.expenseRowLast + ')',
+            }
+        ];
     }
 
     return ranges;
