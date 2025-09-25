@@ -816,7 +816,7 @@ async function onWorksheetChange(eventArgs) {
 
                 sheetInfo['row'] = i;
 
-                var rowRanges = getRowRanges(i, sheetInfo);
+                var rowRanges = getRowRanges(sheetInfo);
 
                 if (rowRanges.length) ranges = ranges.concat(rowRanges);
             }
@@ -824,7 +824,7 @@ async function onWorksheetChange(eventArgs) {
             sheetInfo['row'] = range.values.length;
 
             ranges = ranges.concat(getTotalRowRanges(sheetInfo));
-
+console.log('ranges000 - ' + JSON.stringify(ranges));
             await excel.setSheet(context, sheet, {
                 ranges: ranges
             });
@@ -835,7 +835,7 @@ async function onWorksheetChange(eventArgs) {
 }
 
 function getSheetInfo(values, options) {
-
+console.log('getSheetInfo');
     var sheetInfo = {
         isSummary: (values[0][0] == 'Quote'),
         isBom: (values[0][0] == 'Quantity'),
@@ -846,39 +846,39 @@ function getSheetInfo(values, options) {
 
     var section = '';
 
-    for (var i = 1; i < values.length; i++) {
+    for (var i = 0; i < values.length; i++) {
 
         if (sheetInfo.isSummary && i <= 8) continue;
 
         switch (values[i][0]) {
             case 'Items':
                 section = 'Items';
-                sheetInfo['itemRowFirst'] = i;
-                if (sheetInfo.isSummary) sheetInfo['laborRowLast'] = i - 1;
+                sheetInfo['itemRowFirst'] = i + 1;
+                if (sheetInfo.isSummary) sheetInfo['laborRowLast'] = i;
                 break;
             case 'Labor':
                 section = 'Labor';
-                sheetInfo['laborRowFirst'] = i;
-                if (sheetInfo.isBom) sheetInfo['itemRowLast'] = i - 1;
+                sheetInfo['laborRowFirst'] = i + 1;
+                if (sheetInfo.isBom) sheetInfo['itemRowLast'] = i;
                 break;
             case 'Expenses':
                 section = 'Expenses';
-                sheetInfo['expensesRowFirst'] = i;
-                if (sheetInfo.isBom) sheetInfo['laborRowLast'] = i - 1;
+                sheetInfo['expensesRowFirst'] = i + 1;
+                if (sheetInfo.isBom) sheetInfo['laborRowLast'] = i;
                 break;
             case 'Total':
                 section = '';
-                sheetInfo[sheetInfo.isSummary ? 'itemRowLast' : 'expenseRowLast'] = i - 1;
+                sheetInfo[sheetInfo.isSummary ? 'itemRowLast' : 'expenseRowLast'] = i;
                 break;
             default:
                 {
-                    if (section = 'Items') { if (!sheetInfo.isItem) sheetInfo.isItem = (i >= options.rowFirst && i <= options.rowLast); }
-                    else if (section = 'Labor') { if (!sheetInfo.isLabor) sheetInfo.isLabor = (i >= options.rowFirst && i <= options.rowLast); }
-                    else if (section = 'Expenses') { if (!sheetInfo.isExpense) sheetInfo.isExpense = (i >= options.rowFirst && i <= options.rowLast); }
+                    if (section = 'Items') { if (!sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    else if (section = 'Labor') { if (!sheetInfo.isLabor) sheetInfo.isLabor = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    else if (section = 'Expenses') { if (!sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
                 }
         }
     }
-
+console.log(JSON.stringify(sheetInfo));
     return  sheetInfo;
 }
 /*
@@ -1212,7 +1212,7 @@ function getTotalRowRanges(sheetInfo) {
             }
         ];
     }
-
+console.log('ranges - ' + JSON.stringify(ranges));
     return ranges;
 }
 
