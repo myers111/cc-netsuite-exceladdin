@@ -66,7 +66,7 @@ module.exports = {
             for (var i = 0; i < options.ranges.length; i++) {
 
                 var rangeOptions = options.ranges[i];
-console.log(JSON.stringify(rangeOptions));
+
                 for (var j = 0; j < rangeOptions.range.length; j++) {
     
                     var range = sheet.getRange(rangeOptions.range[j]);
