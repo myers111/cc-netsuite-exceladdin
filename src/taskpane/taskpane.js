@@ -824,7 +824,7 @@ async function onWorksheetChange(eventArgs) {
             sheetInfo['row'] = range.values.length;
 
             ranges = ranges.concat(getTotalRowRanges(sheetInfo));
-console.log('ranges000 - ' + JSON.stringify(ranges));
+
             await excel.setSheet(context, sheet, {
                 ranges: ranges
             });
@@ -835,7 +835,7 @@ console.log('ranges000 - ' + JSON.stringify(ranges));
 }
 
 function getSheetInfo(values, options) {
-console.log('getSheetInfo');
+
     var sheetInfo = {
         isSummary: (values[0][0] == 'Quote'),
         isBom: (values[0][0] == 'Quantity'),
@@ -878,93 +878,10 @@ console.log('getSheetInfo');
                 }
         }
     }
-console.log(JSON.stringify(sheetInfo));
+
     return  sheetInfo;
 }
-/*
-function getType(values, options) {
 
-    var type = {
-        isSummary: (values[0][0] == "Quote"),
-        isItem: false,
-        isLabor: false,
-        isExpense: false
-    };
-
-    if (type.isSummary) { // Is Summary
-
-        type.isItem = isItem(values, {
-            isSummary: true,
-            rowFirst: options.rowFirst,
-            rowLast: options.rowLast
-        });
-    }
-    else if (values[0][0] == "Quantity") { // Is BOM
-
-        type.isItem = isItem(values, {
-            isSummary: false,
-            rowFirst: options.rowFirst,
-            rowLast: options.rowLast
-        });
-        
-        if (!type.isItem) {
-
-            type.isExpense = isExpense(values, {
-                rowFirst: options.rowFirst,
-                rowLast: options.rowLast
-            });
-        }
-    }
-
-    return  type;
-}
-
-function isItem(values, params) {
-
-    for (var i = params.rowFirst - 1; i > 0; i--) {
-
-        if (!isNaN(values[i-1][0])) continue;
-
-        if (values[i-1][0] != 'Items') return false;
-
-        break;
-    }
-
-    for (var i = params.rowLast + 1; i < values.length; i++) {
-
-        if (!isNaN(values[i-1][0])) continue;
-
-        if (values[i-1][0] != (params.isSummary ? 'Total' : 'Labor')) return false;
-
-        break;
-    }
-
-    return true;
-}
-
-function isExpense(values, params) {
-
-    for (var i = params.rowFirst - 1; i > 0; i--) {
-
-        if (!isNaN(values[i-1][0])) continue;
-
-        if (values[i-1][0] != 'Expenses') return false;
-
-        break;
-    }
-
-    for (var i = params.rowLast + 1; i < values.length; i++) {
-
-        if (!isNaN(values[i-1][0])) continue;
-
-        if (values[i-1][0] != 'Total') return false;
-
-        break;
-    }
-
-    return true;
-}
-*/
 function getRowRanges(sheetInfo) {
 
     // Range formats common to all types (with summary conditions)
@@ -1212,7 +1129,7 @@ function getTotalRowRanges(sheetInfo) {
             }
         ];
     }
-console.log('ranges - ' + JSON.stringify(ranges));
+
     return ranges;
 }
 
