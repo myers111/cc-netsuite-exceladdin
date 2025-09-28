@@ -425,7 +425,7 @@ async function addBom(data) {
         itemRowLast: itemData.rowLast,
         laborRowFirst: laborData.rowFirst,
         laborRowLast: laborData.rowLast,
-        expensesRowFirst: expenseData.rowFirst,
+        expenseRowFirst: expenseData.rowFirst,
         expenseRowLast: expenseData.rowLast
     }));
 
@@ -863,7 +863,7 @@ function getSheetInfo(values, options) {
                 break;
             case 'Expenses':
                 section = 'Expenses';
-                sheetInfo['expensesRowFirst'] = i + 1;
+                sheetInfo['expenseRowFirst'] = i + 1;
                 if (sheetInfo.isBom) sheetInfo['laborRowLast'] = i;
                 break;
             case 'Total':
@@ -872,9 +872,9 @@ function getSheetInfo(values, options) {
                 break;
             default:
                 {
-                    if (section = 'Items') { if (!sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
-                    else if (section = 'Labor') { if (!sheetInfo.isLabor) sheetInfo.isLabor = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
-                    else if (section = 'Expenses') { if (!sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    if (section == 'Items') { if (!sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    else if (section == 'Labor') { if (!sheetInfo.isLabor) sheetInfo.isLabor = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    else if (section == 'Expenses') { if (!sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
                 }
         }
     }
@@ -1101,6 +1101,27 @@ function getGroupRowRanges(sheetInfo) {
 
 function getTotalRowRanges(sheetInfo) {
 
+    var E = [];
+    var G = [];
+    
+    if (sheetInfo.itemRowFirst && sheetInfo.itemRowFirst < sheetInfo.itemRowLast) {
+
+        E.push('SUM(E' + (sheetInfo.itemRowFirst + 1) + ':E' + sheetInfo.itemRowLast + ')');
+        G.push('SUM(G' + (sheetInfo.itemRowFirst + 1) + ':G' + sheetInfo.itemRowLast + ')');
+    }
+    
+    if (sheetInfo.laborRowFirst && sheetInfo.laborRowFirst < sheetInfo.laborRowLast) {
+
+        E.push('SUMIFS(E' + (sheetInfo.laborRowFirst + 1) + ':E' + sheetInfo.laborRowLast + ',D' + (sheetInfo.laborRowFirst + 1) + ':D' + sheetInfo.laborRowLast + ',"<>")');
+        G.push('SUMIFS(G' + (sheetInfo.laborRowFirst + 1) + ':G' + sheetInfo.laborRowLast + ',F' + (sheetInfo.laborRowFirst + 1) + ':F' + sheetInfo.laborRowLast + ',"<>")');
+    }
+    
+    if (sheetInfo.expenseRowFirst && sheetInfo.expenseRowFirst < sheetInfo.expenseRowLast) {
+
+        E.push('SUM(E' + (sheetInfo.expenseRowFirst + 1) + ':E' + sheetInfo.expenseRowLast + ')');
+        G.push('SUM(G' + (sheetInfo.expenseRowFirst + 1) + ':G' + sheetInfo.expenseRowLast + ')');
+    }
+
     var ranges = [];
 
     if (sheetInfo.isSummary) {
@@ -1108,11 +1129,11 @@ function getTotalRowRanges(sheetInfo) {
         ranges = [
             {
                 range: ['E' + sheetInfo.row],
-                formula: 'SUM(E' + (sheetInfo.itemRowFirst + 1) + ':E' + sheetInfo.itemRowLast + ')'
+                formula: (E.length ? E.join('+') : '0')
             },
             {
                 range: ['G' + sheetInfo.row],
-                formula: 'SUM(G' + (sheetInfo.itemRowFirst + 1) + ':G' + sheetInfo.itemRowLast + ')'
+                formula: (G.length ? G.join('+') : '0')
             },
         ];
     }
@@ -1121,11 +1142,11 @@ function getTotalRowRanges(sheetInfo) {
         ranges = [
             {
                 range: ['E' + sheetInfo.row],
-                formula: 'SUM(E' + (sheetInfo.itemRowFirst + 1) + ':E' + sheetInfo.itemRowLast + ')+SUMIFS(E' + (sheetInfo.laborRowFirst + 1) + ':E' + sheetInfo.laborRowLast + ',D' + (sheetInfo.laborRowFirst + 1) + ':D' + sheetInfo.laborRowLast + ',"<>")+SUM(E' + (sheetInfo.expensesRowFirst + 1) + ':E' + sheetInfo.expenseRowLast + ')',
+                formula: (E.length ? E.join('+') : '0')
             },
             {
                 range: ['G' + sheetInfo.row],
-                formula: 'SUM(G' + (sheetInfo.itemRowFirst + 1) + ':G' + sheetInfo.itemRowLast + ')+SUMIFS(G' + (sheetInfo.laborRowFirst + 1) + ':G' + sheetInfo.laborRowLast + ',F' + (sheetInfo.laborRowFirst + 1) + ':F' + sheetInfo.laborRowLast + ',"<>")+SUM(G' + (sheetInfo.expensesRowFirst + 1) + ':G' + sheetInfo.expenseRowLast + ')',
+                formula: (G.length ? G.join('+') : '0')
             }
         ];
     }
