@@ -1173,7 +1173,18 @@ async function onAddBom() {
 
 async function onCreateRevision() {
 
-    onSave();
+    var params = {
+        path: 'quote-revision',
+        options: {data: {quoteId: $('#quoteList').val()}}
+    };
+
+    var quote = await api.post(params);
+
+    var sel = $('#quoteList');
+
+    sel.append('<option value="' + quote.id + '" selected>' + quote.name + '</option>');
+
+    onQuote();
 }
 
 async function onReload() {
@@ -1218,8 +1229,13 @@ async function onSave() {
                     return;
                 else if (range.values[0][0] != 'Quantity')
                     return;
-                else
-                    data.boms.push({id: WORKSHEET[sheet.id.toString()].bomId, name: sheet.name, items: [], expenses: []});
+                else {
+                    
+                    let bomId = WORKSHEET[sheet.id.toString()].bomId;
+                    if (!bomId) bomId = 0;
+
+                    data.boms.push({id: bomId, name: sheet.name, items: [], expenses: []});
+                }
 
                 var section = '';
      
