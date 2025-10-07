@@ -145,6 +145,7 @@ async function onQuote() {
         };
 
         await addSummary(data);
+
         const promises = [];
 
         for (var i = 0; i < data.boms.length; i++) {
@@ -410,6 +411,22 @@ async function addBom(data) {
 
         await context.sync();
     });
+
+    await addBomToSummary(data);
+}
+
+async function addBomToSummary(data) {
+
+    await Excel.run(async (context) => {
+
+        var sheet = await excel.getSheet(context, 'Summary');
+
+        await excel.setSheet(context, sheet, {
+            ranges: ranges
+        });
+
+        await context.sync();
+    });
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -648,12 +665,12 @@ async function onWorksheetChange(eventArgs) {
     });
 }
 
-function getSheetInfo(values, options) {
+function getSheetInfo(values, rows) {
 
     var sheetInfo = {
         isSummary: (values[0][0] == 'Quote'),
         isBom: (values[0][0] == 'Quantity'),
-        isInsert: (options != null),
+        isInsert: (rows != null),
         isItem: false,
         isExpense: false
     };
@@ -673,7 +690,7 @@ function getSheetInfo(values, options) {
                 if (sheetInfo.isSummary) {
                     
                     sheetInfo['laborRowLast'] = i;
-                    ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
+                    if (!rows) ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
                 }
                 break;
             case 'Labor':
@@ -685,7 +702,7 @@ function getSheetInfo(values, options) {
                 section = 'Expenses';
                 sheetInfo['expenseRowFirst'] = i + 1;      
                 sheetInfo['laborRowLast'] = i;
-                ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
+                if (!rows) ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
                 break;
             case 'Total':
                 section = '';
@@ -695,26 +712,31 @@ function getSheetInfo(values, options) {
                 {
                     if (section == 'Items') {
                         
-                        ranges = ranges.concat(getItemSectionRanges(i + 1, sheetInfo));
-                        if (options && !sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast);
+                        if (!rows || (rows && i + 1 >= rows.rowFirst && i + 1 <= rows.rowLast)) ranges = ranges.concat(getItemSectionRanges(i + 1, sheetInfo));
+
+                        if (rows && !sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= rows.rowFirst && i + 1 <= rows.rowLast);
                     }
                     else if (section == 'Labor') {
-                        
-                        if (values[i][1].length) {
 
-                            ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
+                        if (!rows) {
 
-                            sheetInfo['rowSum'] = i + 1;
-                        }
-                        else {
+                            if (values[i][1].length) { // This is a labor group
 
-                            ranges = ranges.concat(getLaborSectionRanges(i + 1, sheetInfo));
+                                ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
+
+                                sheetInfo['rowSum'] = i + 1;
+                            }
+                            else {
+
+                                ranges = ranges.concat(getLaborSectionRanges(i + 1, sheetInfo));
+                            }
                         }
                     }
                     else if (section == 'Expenses') {
 
-                        ranges = ranges.concat(getExpenseSectionRanges(i + 1, sheetInfo));
-                        if (options && !sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast);
+                        if (!rows || (rows && i + 1 >= rows.rowFirst && i + 1 <= rows.rowLast)) ranges = ranges.concat(getExpenseSectionRanges(i + 1, sheetInfo));
+
+                        if (rows && !sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= rows.rowFirst && i + 1 <= rows.rowLast);
                     }
                 }
         }
@@ -830,6 +852,10 @@ function getItemSectionRanges(row, sheetInfo) {
                 {
                     range: ['B' + row + ':C' + row],
                     color: COLOR_INPUT
+                },
+                {
+                    range: ['A' + row],
+                    bold: false
                 }
             ]);
         }
