@@ -144,7 +144,8 @@ async function onQuote() {
             expAccounts: data.expAccounts
         };
 
-        await addSummary(data);
+        await initialize();
+
         const promises = [];
 
         for (var i = 0; i < data.boms.length; i++) {
@@ -157,6 +158,8 @@ async function onQuote() {
         }
 
         await Promise.all(promises);
+
+        await addSummary(data);
     }
 
     document.getElementById("controls").style.display = (quoteId > 0 ? '' : 'none');
@@ -198,66 +201,84 @@ async function reset() {
     });
 }
 
+async function initialize() {
+
+    // G2 must be set to a value since it is referenced in formulas on the BOM's which are created before the Summary
+    // BOM formulas referencing Summary!$G$2 won't work if this isn't done
+
+    await Excel.run(async (context) => {
+
+        var sheet = await excel.getSheet(context, 'Summary');
+
+        await excel.setSheet(context, sheet, {
+            ranges: [
+                {
+                    range: ['G2'],
+                    values: [[0]]
+                }
+            ]
+        });
+    });
+}
+
 async function addSummary(data) {
 
-    // The data is 7 columns (add 3 spaces for hidden columns)
-
-    var values = [
-        ['Quote','','','','','',0,'','',''],
-        ['MU (Default)','','','','','',(data.defaultMU / 100),'','',''],
-        ['GM','','','','','',0,'','',''],
-        ['MU','','','','Cost','Quote',0,'','',''],
-        [LABEL_ITEMS,'','','',0,0,0,'','',''],
-        [LABEL_LABOR,'','','',0,0,0,'','',''],
-        ['','','','','','','','','',''],
-        LABEL_HEADER.concat(['','','']),
-        [LABEL_LABOR,'','','','','','','','',''],
-        [LABEL_ITEMS,'','','','','','','','',''],
-        [LABEL_TOTAL,'','','',0,'',0,'','','']
+    var dataArray = [
+        ['Quote','','','','','',0],
+        ['MU (Default)','','','','','',(data.defaultMU / 100)],
+        ['GM','','','','','',0],
+        ['MU','','','','Cost','Quote',0],
+        [LABEL_ITEMS,'','','',0,0,0],
+        [LABEL_LABOR,'','','',0,0,0],
+        ['','','','','','',''],
+        LABEL_HEADER
     ];
 
-    // Items
+    for (var i = 0; i < dataArray.length; i++) {
 
-    var itemValues = getItemValues({
-        items: data.items,
-        isSummary: true
-    });
+        dataArray[i] = dataArray[i].concat(['','','']); // Add spaces for hidden columns
+    }
 
-    if (itemValues.length) values.splice(10, 0, ...itemValues);
+    var dataRanges = [];
 
-    // Labor
-
-    var laborValues = getLaborValues({
+    var laborData = getLaborData({
         boms: data.boms,
+        rowFirst: dataArray.length + 1,
         isSummary: true
     });
 
-    if (laborValues.length) values.splice(9, 0, ...laborValues);
+    dataArray = dataArray.concat(laborData.values);
+    dataRanges = dataRanges.concat(laborData.ranges);
 
-    // Sheet Info
+    var itemData = getItemData({
+        items: data.items,
+        rowFirst: dataArray.length + 1,
+        isSummary: true
+    });
 
-    var sheetInfo = getSheetInfo(values);
+    dataArray = dataArray.concat(itemData.values);
+    dataRanges = dataRanges.concat(itemData.ranges);
 
-    // Ranges
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0]);
 
-    var ranges = sheetInfo.ranges;
+    dataArray[dataArray.length - 1] = dataArray[dataArray.length - 1].concat(['','','']); // Add spaces for hidden columns
 
-    ranges = ranges.concat([
+    dataRanges = dataRanges.concat([
         {
             range: ['G2'],
             color: COLOR_INPUT
         },
         {
             range: ['G1'],
-            formula: '$G$' + values.length,
+            formula: '$G$' + dataArray.length,
             numberFormat: '$#,###.00'
         },
         {
-            range: ['E5:F6','E' + values.length, 'G' + values.length],
+            range: ['E5:F6','E' + dataArray.length, 'G' + dataArray.length],
             numberFormat: '$#,###.00'
         },
         {
-            range: ['A1:G8','A' + values.length + ':G' + values.length,'A' + sheetInfo.laborRowFirst,'A' + sheetInfo.itemRowFirst],
+            range: ['A1:G8','A' + dataArray.length + ':G' + dataArray.length],
             bold: true
         },
         {
@@ -266,35 +287,35 @@ async function addSummary(data) {
         },
         {
             range: ['G3'],
-            formula: '($G$1-$E$' + values.length + ')/IF($G$1>0,$G$1,1)'
+            formula: '($G$1-$E$' + dataArray.length + ')/IF($G$1>0,$G$1,1)'
         },
         {
             range: ['G4'],
-            formula: '($G$1-$E$' + values.length + ')/IF($E$' + values.length + '>0,$E$' + values.length + ',1)'
+            formula: '($G$1-$E$' + dataArray.length + ')/IF($E$' + dataArray.length + '>0,$E$' + dataArray.length + ',1)'
         },
         {
             range: ['E5'],
-            formula: 'E' + values.length + '-E6'
+            formula: 'E' + dataArray.length + '-E6'
         },
         {
             range: ['F5'],
-            formula: 'G' + values.length + '-F6'
+            formula: 'G' + dataArray.length + '-F6'
         },
         {
             range: ['G5'],
-            formula: ('IF($E$' + values.length + '=0,0,$E$5/$E$' + values.length + ')')
+            formula: ('IF($E$' + dataArray.length + '=0,0,$E$5/$E$' + dataArray.length + ')')
         },
         {
             range: ['E6'],
-            formula: 'SUMIFS(E' + (sheetInfo.laborRowFirst + 1) + ':E' + sheetInfo.laborRowLast + ',D' + (sheetInfo.laborRowFirst + 1) + ':D' + sheetInfo.laborRowLast + ',"<>")'
+            formula: 'SUMIFS(E' + (laborData.rowFirst + 1) + ':E' + laborData.rowLast + ',D' + (laborData.rowFirst + 1) + ':D' + laborData.rowLast + ',"<>")'
         },
         {
             range: ['F6'],
-            formula: 'SUMIFS(G' + (sheetInfo.laborRowFirst + 1) + ':G' + sheetInfo.laborRowLast + ',F' + (sheetInfo.laborRowFirst + 1) + ':F' + sheetInfo.laborRowLast + ',"<>")'
+            formula: 'SUMIFS(G' + (laborData.rowFirst + 1) + ':G' + laborData.rowLast + ',F' + (laborData.rowFirst + 1) + ':F' + laborData.rowLast + ',"<>")'
         },
         {
             range: ['G6'],
-            formula: ('IF($E$' + values.length + '=0,0,$E$6/$E$' + values.length + ')')
+            formula: ('IF($E$' + dataArray.length + '=0,0,$E$6/$E$' + dataArray.length + ')')
         },
         {
             range:['H:J'],
@@ -302,15 +323,20 @@ async function addSummary(data) {
         }
     ]);
 
-    ranges = ranges.concat(getTotalRowRanges(values.length, sheetInfo));
+    dataRanges = dataRanges.concat(getTotalRowRanges({
+        row: dataArray.length,
+        isSummary: true,
+        itemRowFirst: itemData.rowFirst,
+        itemRowLast: itemData.rowLast
+    }));
 
     await Excel.run(async (context) => {
 
         var sheet = await excel.getSheet(context, "Summary");
 
         await excel.setSheet(context, sheet, {
-            values: values,
-            ranges: ranges,
+            values: dataArray,
+            ranges: dataRanges,
             autofitColumns: 7
         });
 
@@ -322,60 +348,60 @@ async function addSummary(data) {
 
 async function addBom(data) {
 
-    // The data is 13 columns (add 1 space for group control and 3 spaces for hidden columns)
-
-    var values = [
-        LABEL_HEADER.concat(LABEL_HEADER_EX).concat(['','','','']),
-        [LABEL_ITEMS,'','','','','','','','','','','','','','','',''],
-        [LABEL_LABOR,'','','','','','','','','','','','','','','',''],
-        [LABEL_EXPENSES,'','','','','','','','','','','','','','','',''],
-        [LABEL_TOTAL,'','','',0,'',0,'','','','','','','','','','']
+    var dataArray = [
+        LABEL_HEADER.concat(LABEL_HEADER_EX).concat(['']).concat(['','',''])
     ];
 
-    // Expenses
-
-    var expenseValues = getExpenseValues({
-        expenses: data.bom.expenses,
-        isSummary: false
-    });
-
-    if (expenseValues.length) values.splice(4, 0, ...expenseValues);
-
-    // Labor
-
-    var laborValues = getLaborValues({
-        boms: [data.bom],
-        isSummary: false
-    });
-
-    if (laborValues.length) values.splice(3, 0, ...laborValues);
+    var dataRanges = [];
 
     // Items
 
-    var itemValues = getItemValues({
+    var itemData = getItemData({
         items: data.bom.items,
         units: data.units,
+        rowFirst: dataArray.length + 1,
         isSummary: false
     });
 
-    if (itemValues.length) values.splice(2, 0, ...itemValues);
+    dataArray = dataArray.concat(itemData.values);
+    dataRanges = dataRanges.concat(itemData.ranges);
 
-    // Sheet Info
+    // Labor
 
-    var sheetInfo = getSheetInfo(values);
+    var laborData = getLaborData({
+        boms: [data.bom],
+        rowFirst: dataArray.length + 1,
+        isSummary: false
+    });
 
-    // Ranges
+    dataArray = dataArray.concat(laborData.values);
+    dataRanges = dataRanges.concat(laborData.ranges);
 
-    var ranges = sheetInfo.ranges;
-/*
+    // Expenses
+
+    var expenseData = getExpenseData({
+        expenses: data.bom.expenses,
+        rowFirst: dataArray.length + 1
+    });
+
+    dataArray = dataArray.concat(expenseData.values);
+    dataRanges = dataRanges.concat(expenseData.ranges);
+
+    // Totals
+
+    dataArray.push([LABEL_TOTAL,'','','',0,'',0,'','','','','','']);
+
+    dataArray[dataArray.length - 1] = dataArray[dataArray.length - 1].concat(['']); // Add space for group control
+    dataArray[dataArray.length - 1] = dataArray[dataArray.length - 1].concat(['','','']); // Add spaces for hidden columns
+
     // Set summaryFormulas
 
     summaryFormulas.cost[data.bom.name] = "E" + dataArray.length;
     summaryFormulas.quote[data.bom.name] = "G" + dataArray.length;
-*/
-    ranges = ranges.concat([
+
+    dataRanges = dataRanges.concat([
         {
-            range: ['A' + values.length + ':G' + values.length,'A' + sheetInfo.itemRowFirst,'A' + sheetInfo.laborRowFirst,'A' + sheetInfo.expenseRowFirst],
+            range: ['A1:M1','A' + dataArray.length + ':M' + dataArray.length],
             bold: true
         },
         {
@@ -392,7 +418,16 @@ async function addBom(data) {
         }
     ]);
 
-    ranges = ranges.concat(getTotalRowRanges(values.length, sheetInfo));
+    dataRanges = dataRanges.concat(getTotalRowRanges({
+        row: dataArray.length,
+        isSummary: false,
+        itemRowFirst: itemData.rowFirst,
+        itemRowLast: itemData.rowLast,
+        laborRowFirst: laborData.rowFirst,
+        laborRowLast: laborData.rowLast,
+        expenseRowFirst: expenseData.rowFirst,
+        expenseRowLast: expenseData.rowLast
+    }));
 
     await Excel.run(async (context) => {
 
@@ -401,8 +436,8 @@ async function addBom(data) {
         WORKSHEET[sheet.id.toString()] = {bomId: data.bom.id};
 
         await excel.setSheet(context, sheet, {
-            values: values,
-            ranges: ranges,
+            values: dataArray,
+            ranges: dataRanges,
             autofitColumns: 13
         });
 
@@ -414,18 +449,42 @@ async function addBom(data) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function getItemValues(data) {
+function getItemData(data) {
 
-    var values = [];
+    /* data = { items, rowFirst, isSummary } *******************************************************************************************************************/
+    
+    var itemData = {
+        values: [
+            [LABEL_ITEMS,'','','','','','']
+        ],
+        ranges: [
+            {
+                range: ['A' + data.rowFirst],
+                bold: true
+            }
+        ],
+        rowFirst: data.rowFirst,
+        rowLast: 0
+    };
+
+    if (!data.isSummary) {
+
+        itemData.values[0] = itemData.values[0].concat(['','','','','','']); // Add spaces for extra BOM columns
+        itemData.values[0] = itemData.values[0].concat(['']); // Add space for group control
+    }
+
+    itemData.values[0] = itemData.values[0].concat(['','','']); // Add spaces for hidden columns
+
+    // Set values
 
     for (var i = 0; i < data.items.length; i++) {
-
+    
         var item = data.items[i];
 
         var quantity = (item.quantity ? parseInt(item.quantity) : 0);
         var price = (item.price ? parseFloat(item.price) : 0);
 
-        var line = [
+        itemData.values.push([
             quantity,
             (item.id == NEW_ITEM ? item.newItem : item.name),
             item.description,
@@ -433,38 +492,79 @@ function getItemValues(data) {
             0,
             0,
             0
-        ];
+        ]);
 
-        if (!data.isSummary) {
+        var itemDataValuesLength = itemData.values.length;
+
+        var sheetInfo = {
+            row: data.rowFirst + 1 + i,
+            isSummary: data.isSummary,
+            isItem: true
+        };
+
+        if (data.isSummary) {
+
+            if (item.bomId > 0) sheetInfo['bomName'] = item.description;
+        }
+        else {
 
             const unit = data.units.find((obj) => obj.type === item.unitsType);
 
-            //if (unit) sheetInfo['unitNames'] = unit.names;
+            if (unit) sheetInfo['unitNames'] = unit.names;
 
-            line = line.concat([
+            itemData.values[itemDataValuesLength - 1] = itemData.values[itemDataValuesLength - 1].concat([
                 (item.markUp > 0 ? item.markUp : ''),
                 (item.discount == 'T' ? 'Yes' : 'No'),
                 item.units,
                 (item.vendorId ? item.vendor : item.newVendor),
                 item.manufacturer,
-                item.mpn,
-                '' // Add space for group control
+                item.mpn
             ]);
         }
 
-        line.push(item.key); // Add key for hidden column
-        line.push(item.id); // Add item ID for hidden column
-        line.push(data.isSummary ? item.bomId : 0); // Add bom ID for hidden column
+        if (!data.isSummary) itemData.values[itemDataValuesLength - 1].push(''); // Add space for group control
+        itemData.values[itemDataValuesLength - 1].push(item.key); // Add key for hidden column
+        itemData.values[itemDataValuesLength - 1].push(item.id); // Add item ID for hidden column
+        itemData.values[itemDataValuesLength - 1].push(data.isSummary ? item.bomId  : 0); // Add bom ID for hidden column
 
-        values.push(line);
+        itemData.ranges = itemData.ranges.concat(getRowRanges(sheetInfo));
     }
 
-    return values;
+    itemData.rowLast = itemData.rowFirst + data.items.length;
+
+    return itemData;
 }
 
-function getLaborValues(data) {
+function getLaborData(data) {
 
-    var values = [];
+    /* data = { boms, rowFirst, isSummary } *******************************************************************************************************************/
+    
+    var laborData = {
+        values: [
+            [LABEL_LABOR,'','','','','','']
+        ],
+        ranges: [
+            {
+                range: ['A' + data.rowFirst],
+                bold: true
+            }
+        ],
+        rowFirst: data.rowFirst,
+        rowLast: 0
+    };
+
+    if (!data.isSummary) {
+        
+        laborData.values[0] = laborData.values[0].concat(['']); // Add space for group control
+        laborData.values[0] = laborData.values[0].concat(['','','','','','']); // Add spaces for extra columns
+    }
+
+    laborData.values[0] = laborData.values[0].concat(['','','']); // Add spaces for hidden columns
+
+    var sheetInfo = {
+        isSummary: data.isSummary,
+        isLabor: true
+    };
 
     // Create labor object
 
@@ -490,27 +590,23 @@ function getLaborValues(data) {
 
         if (!objLabor.hasOwnProperty(key)) continue;
 
-        // Labor group
-
-        var line = [0,key,'','',0,'',0];
+        var groupArray = [0,key,'','',0,'',0];
 
         if (!data.isSummary) {
             
-            line = line.concat(['','','','','','']); // Add spaces for extra columns
-            line = line.concat(['']); // Add space for group control
+            groupArray = groupArray.concat(['','','','','','']); // Add spaces for extra columns
+            groupArray = groupArray.concat(['']); // Add space for group control
         }
 
-        line = line.concat(['','','']); // Add spaces for hidden columns
+        groupArray = groupArray.concat(['','','']); // Add spaces for hidden columns
 
-        values.push(line);
-
-        // Labor items
+        laborData.values.push(groupArray);
 
         for (var i = 0; i < objLabor[key].length; i++) {
 
             var labor = objLabor[key][i];
 
-            line = [
+            laborData.values.push([
                 labor.quantity,
                 '',
                 labor.name,
@@ -518,38 +614,111 @@ function getLaborValues(data) {
                 0,
                 0,
                 0
-            ];
+            ]);
+
+            var laborDataValuesLength = laborData.values.length;
+
+            var row = laborData.rowFirst + laborDataValuesLength - 1;
+
+            var idString = labor.id.toString();
 
             if (data.isSummary) {
 
-                line = line.concat(['','','']); // Add spaces for hidden columns
+                laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat(['','','']); // Add spaces for hidden columns
+
+                sheetInfo['summaryFormulas'] = summaryFormulas.labor[key][idString];
             }
             else {
 
-                line = line.concat([
+                laborData.values[laborDataValuesLength - 1] = laborData.values[laborDataValuesLength - 1].concat([
                     (labor.markUp > 0 ? labor.markUp : ''),
                     (labor.discount == 'T' ? 'Yes' : 'No'),
                     '',
                     '',
                     '',
-                    '',
-                    '',         // Add space for group control
-                    labor.key,  // Add key to hidden column
-                    labor.id,   // Add item ID to hidden column
-                    labor.sgId// Add group ID to hidden column
+                    ''
                 ]);
+
+                laborData.values[laborDataValuesLength - 1].push(''); // Add space for group control
+                laborData.values[laborDataValuesLength - 1].push(labor.key); // Add key to hidden column
+                laborData.values[laborDataValuesLength - 1].push(labor.id); // Add item ID to hidden column
+                laborData.values[laborDataValuesLength - 1].push(labor.sgId); // Add group ID to hidden column
+
+                // Formulas
+                
+                if (!summaryFormulas.labor[key]) summaryFormulas.labor[key] = {};
+
+                if (summaryFormulas.labor[key][idString]) {
+
+                    summaryFormulas.labor[key][idString].qty += '+';
+                    summaryFormulas.labor[key][idString].cost += '+';
+                    summaryFormulas.labor[key][idString].quote += '+';
+                }
+                else {
+
+                    summaryFormulas.labor[key][idString] = {
+                        qty: '',
+                        cost: '',
+                        quote: ''
+                    };
+                }
+
+                summaryFormulas.labor[key][idString].qty += ("'" + data.boms[0].name + "'!A" + row);
+                summaryFormulas.labor[key][idString].cost += ("'" + data.boms[0].name + "'!D" + row);
+                summaryFormulas.labor[key][idString].quote += ("'" + data.boms[0].name + "'!F" + row);
             }
 
-            values.push(line);
+            sheetInfo['row'] = data.rowFirst + laborDataValuesLength - 1;
+
+            laborData.ranges = laborData.ranges.concat(getRowRanges(sheetInfo));
         }
     }
 
-    return values;
+    laborData.rowLast = laborData.rowFirst + laborData.values.length - 1;
+
+    // Set labor formulas & grouping
+
+    sheetInfo['rowSum'] = 0;
+
+    for (var i = laborData.rowFirst + 1; i <= laborData.rowLast; i++) {
+
+        if (laborData.values[i - laborData.rowFirst][3] == '') {
+
+            sheetInfo['row'] = i;
+
+            if (sheetInfo.rowSum != 0) laborData.ranges = laborData.ranges.concat(getGroupRowRanges(sheetInfo));
+
+            sheetInfo.rowSum = i;
+        }
+    }
+
+    sheetInfo['row'] = laborData.rowLast + 1;
+
+    if (sheetInfo.rowSum != 0) laborData.ranges = laborData.ranges.concat(getGroupRowRanges(sheetInfo));
+
+    return laborData;
 }
 
-function getExpenseValues(data) {
+function getExpenseData(data) {
 
-    var values = [];
+    /* data = { expenses, rowFirst } *******************************************************************************************************************/
+    
+    var expenseData = {
+        values: [
+            [LABEL_EXPENSES,'','','','','','','','','','','','']
+        ],
+        ranges: [
+            {
+                range: ['A' + data.rowFirst],
+                bold: true
+            }
+        ],
+        rowFirst: data.rowFirst,
+        rowLast: 0
+    };
+
+    expenseData.values[0] = expenseData.values[0].concat(['']); // Add space for group control
+    expenseData.values[0] = expenseData.values[0].concat(['','','']); // Add spaces for hidden columns
 
     // Set values
 
@@ -557,7 +726,7 @@ function getExpenseValues(data) {
     
         var expense = data.expenses[i];
 
-        values.push([
+        expenseData.values.push([
             expense.quantity,
             '',
             expense.name,
@@ -576,9 +745,16 @@ function getExpenseValues(data) {
             expense.accountId, // Add account ID for hidden column
             ''
         ]);   
+
+        expenseData.ranges = expenseData.ranges.concat(getRowRanges({
+            row: data.rowFirst + 1 + i,
+            isExpense: true
+        }));
     }
 
-    return values;
+    expenseData.rowLast = expenseData.rowFirst + data.expenses.length;
+
+    return expenseData;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -601,13 +777,15 @@ async function onWorksheetChange(eventArgs) {
 
             var rowFirst = parseInt(rows[0]);
             var rowLast = parseInt(rows[1]);
-
+            
             var sheetInfo = getSheetInfo(range.values, {
                 rowFirst: rowFirst,
                 rowLast: rowLast
             });
 
-            var ranges = sheetInfo.ranges;
+            sheetInfo['isInsert'] = true;
+
+            var ranges = [];
 
             for (var i = rowFirst; i <= rowLast; i++) {
 
@@ -635,9 +813,17 @@ async function onWorksheetChange(eventArgs) {
                         values: [[1,'','',0,0,0,0,'','No']]
                     }]);
                 }
+
+                sheetInfo['row'] = i;
+
+                var rowRanges = getRowRanges(sheetInfo);
+
+                if (rowRanges.length) ranges = ranges.concat(rowRanges);
             }
 
-            ranges = ranges.concat(getTotalRowRanges(range.values.length, sheetInfo));
+            sheetInfo['row'] = range.values.length;
+
+            ranges = ranges.concat(getTotalRowRanges(sheetInfo));
 
             await excel.setSheet(context, sheet, {
                 ranges: ranges
@@ -653,28 +839,22 @@ function getSheetInfo(values, options) {
     var sheetInfo = {
         isSummary: (values[0][0] == 'Quote'),
         isBom: (values[0][0] == 'Quantity'),
-        isInsert: (options != null),
         isItem: false,
+        isLabor: false,
         isExpense: false
     };
-
-    var ranges = [];
 
     var section = '';
 
     for (var i = 0; i < values.length; i++) {
 
-        if ((sheetInfo.isSummary && i <= 7) || (sheetInfo.isBom && i == 0)) continue; // Skip the headings
+        if (sheetInfo.isSummary && i <= 8) continue;
 
         switch (values[i][0]) {
             case 'Items':
                 section = 'Items';
                 sheetInfo['itemRowFirst'] = i + 1;
-                if (sheetInfo.isSummary) {
-                    
-                    sheetInfo['laborRowLast'] = i;
-                    ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
-                }
+                if (sheetInfo.isSummary) sheetInfo['laborRowLast'] = i;
                 break;
             case 'Labor':
                 section = 'Labor';
@@ -683,9 +863,8 @@ function getSheetInfo(values, options) {
                 break;
             case 'Expenses':
                 section = 'Expenses';
-                sheetInfo['expenseRowFirst'] = i + 1;      
-                sheetInfo['laborRowLast'] = i;
-                ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
+                sheetInfo['expenseRowFirst'] = i + 1;
+                if (sheetInfo.isBom) sheetInfo['laborRowLast'] = i;
                 break;
             case 'Total':
                 section = '';
@@ -693,81 +872,65 @@ function getSheetInfo(values, options) {
                 break;
             default:
                 {
-                    if (section == 'Items') {
-                        
-                        ranges = ranges.concat(getItemSectionRanges(i + 1, sheetInfo));
-                        if (options && !sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast);
-                    }
-                    else if (section == 'Labor') {
-                        
-                        if (values[i][1].length) {
-
-                            ranges = ranges.concat(getLaborSectionGroupRanges(i + 1, sheetInfo));
-
-                            sheetInfo['rowSum'] = i + 1;
-                        }
-                        else {
-
-                            ranges = ranges.concat(getLaborSectionRanges(i + 1, sheetInfo));
-                        }
-                    }
-                    else if (section == 'Expenses') {
-
-                        ranges = ranges.concat(getExpenseSectionRanges(i + 1, sheetInfo));
-                        if (options && !sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast);
-                    }
+                    if (section == 'Items') { if (!sheetInfo.isItem) sheetInfo.isItem = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    else if (section == 'Labor') { if (!sheetInfo.isLabor) sheetInfo.isLabor = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
+                    else if (section == 'Expenses') { if (!sheetInfo.isExpense) sheetInfo.isExpense = (i + 1 >= options.rowFirst && i + 1 <= options.rowLast); }
                 }
         }
     }
 
-    sheetInfo['ranges'] = ranges;
-
     return  sheetInfo;
 }
 
-function getDefaultSectionRanges(row, sheetInfo) {
+function getRowRanges(sheetInfo) {
 
-    // Range formats common to all types
+    // Range formats common to all types (with summary conditions)
 
     var ranges = [
         {
-            range: ['D' + row + ':G' + row],
+            range: ['A' + sheetInfo.row],
+            color: (sheetInfo.isSummary && sheetInfo.isLabor ? '' : COLOR_INPUT),
+            horizontalAlignment: 'center',
+            bold: false
+        },
+        {
+            range: ['D' + sheetInfo.row + ':G' + sheetInfo.row],
             numberFormat: '$#,###.00'
         },
         {
-            range: ['E' + row],
+            range: ['E' + sheetInfo.row],
             formula: 'A?*D?'
         },
         {
-            range: ['G' + row],
+            range: ['F' + sheetInfo.row],
+            formula: (sheetInfo.isSummary ? '' : 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))')
+        },
+        {
+            range: ['G' + sheetInfo.row],
             formula: 'A?*F?'
         }
     ];
 
-    // Range formats common to BOM's only
+    // Range formats common to BOM's
 
-    if (sheetInfo.isBom) {
+    if (!sheetInfo.isSummary) {
 
         ranges = ranges.concat([
             {
-                range: ['D' + row],
+                range: ['D' + sheetInfo.row],
                 color: COLOR_INPUT
             },
             {
-                range: ['F' + row],
-                formula: 'D?*(1+IF(I?="Yes",-1,1)*IF(ISNUMBER(H?),H?,Summary!$G$2))'
-            },
-            {
-                range: ['H' + row + ':I' + row],
+                range: ['H' + sheetInfo.row + ':I' + sheetInfo.row],
                 color: COLOR_INPUT,
                 horizontalAlignment: 'center'
             },
             {
-                range: ['H' + row],
+                range: ['H' + sheetInfo.row],
                 numberFormat: '#,###.00%'
             },
             {
-                range: ['I' + row],
+                range: ['I' + sheetInfo.row],
                 dataValidationRule: {
                     list: {
                         inCellDropDown: true,
@@ -777,181 +940,166 @@ function getDefaultSectionRanges(row, sheetInfo) {
             }
         ]);
     }
+    
+    // Range formats specific to each section
 
-    return ranges;
-}
+    if (sheetInfo.isItem) {
 
-function getItemSectionRanges(row, sheetInfo) {
+        ranges = ranges.concat([
+            {
+                range: ['B' + sheetInfo.row], // Set column B to text format to preserve leading zero's in item names
+                data: [[0]]
+            }
+        ]);
 
-    var ranges = getDefaultSectionRanges(row, sheetInfo);
+        if (sheetInfo.isSummary) {
 
-    ranges = ranges.concat([
-        {
-            range: ['B' + row], // Set column B to text format to preserve leading zero's in item names
-            data: [[0]]
-        }
-    ]);
+            if (sheetInfo.bomName) {
 
-    if (sheetInfo.isSummary) {
+                ranges = ranges.concat([
+                    {
+                        range: ['C' + sheetInfo.row],
+                        formula: 'TEXTAFTER(CELL("filename",\'' + sheetInfo.bomName + '\'!A1),"]")'
 
-        if (sheetInfo.bomName) {
+                    },
+                    {
+                        range: ['D' + sheetInfo.row],
+                        formula: "'" + sheetInfo.bomName + "'!" + summaryFormulas.cost[sheetInfo.bomName]
+                    },
+                    {
+                        range: ['F' + sheetInfo.row],
+                        formula: "'" + sheetInfo.bomName + "'!" + summaryFormulas.quote[sheetInfo.bomName]
+                    }
+                ]);
+            }
+            else {
 
-            ranges = ranges.concat([
-                {
-                    range: ['C' + row],
-                    formula: 'TEXTAFTER(CELL("filename",\'' + sheetInfo.bomName + '\'!A1),"]")'
-
-                },
-                {
-                    range: ['D' + row],
-                    formula: "'" + sheetInfo.bomName + "'!" + summaryFormulas.cost[sheetInfo.bomName]
-                },
-                {
-                    range: ['F' + row],
-                    formula: "'" + sheetInfo.bomName + "'!" + summaryFormulas.quote[sheetInfo.bomName]
-                }
-            ]);
+                ranges = ranges.concat([
+                    {
+                        range: ['B' + sheetInfo.row + ':D' + sheetInfo.row],
+                        color: COLOR_INPUT
+                    }
+                ]);
+            }
         }
         else {
 
+            if (sheetInfo.isInsert) {
+
+                ranges = ranges.concat([
+                    {
+                        range: ['B' + sheetInfo.row + ':C' + sheetInfo.row],
+                        color: COLOR_INPUT
+                    }
+                ]);
+            }
+
             ranges = ranges.concat([
                 {
-                    range: ['B' + row + ':D' + row],
+                    range: ['K' + sheetInfo.row + ':M' + sheetInfo.row],
                     color: COLOR_INPUT
+                },
+                {
+                    range: ['J' + sheetInfo.row],
+                    color: COLOR_INPUT,
+                    dataValidationRule: {
+                        list: {
+                            inCellDropDown: true,
+                            source: (sheetInfo.unitNames ? sheetInfo.unitNames : LISTS.units.filter(unit => unit.type != 3).map(unit => unit.names).join(',')) // Filter out labor units
+                        }
+                    }
+                },
+            ]);
+        }
+    }
+    else if (sheetInfo.isLabor) {
+
+        if (sheetInfo.isSummary) {
+
+            ranges = ranges.concat([
+                {
+                    range: ['A' + sheetInfo.row],
+                    formula: sheetInfo.summaryFormulas.qty
+                },
+                {
+                    range: ['D' + sheetInfo.row],
+                    formula: sheetInfo.summaryFormulas.cost
+                },
+                {
+                    range: ['F' + sheetInfo.row],
+                    formula: sheetInfo.summaryFormulas.quote
                 }
             ]);
         }
     }
-    else {
+    else if (sheetInfo.isExpense) {
 
         if (sheetInfo.isInsert) {
 
             ranges = ranges.concat([
                 {
-                    range: ['B' + row + ':C' + row],
+                    range: ['C' + sheetInfo.row],
                     color: COLOR_INPUT
+                },
+                {
+                    range: ['C' + sheetInfo.row],
+                    dataValidationRule: {
+                        list: {
+                            inCellDropDown: true,
+                            source: LISTS.expAccounts.join(',')
+                        }
+                    }
                 }
             ]);
         }
-
-        ranges = ranges.concat([
-            {
-                range: ['K' + row + ':M' + row],
-                color: COLOR_INPUT
-            },
-            {
-                range: ['J' + row],
-                color: COLOR_INPUT,
-                dataValidationRule: {
-                    list: {
-                    inCellDropDown: true,
-                    source: (sheetInfo.unitNames ? sheetInfo.unitNames : LISTS.units.filter(unit => unit.type != 3).map(unit => unit.names).join(',')) // Filter out labor units
-                    }
-                }
-            },
-        ]);
     }
 
     return ranges;
 }
 
-function getLaborSectionGroupRanges(row, sheetInfo) {
+function getGroupRowRanges(sheetInfo) {
 
     var ranges = [];
 
-    if (sheetInfo.rowSum) {
+    if (sheetInfo.isLabor) {
 
-        ranges = ranges.concat([
-            {
-                range: ['A' + sheetInfo.rowSum],
-                formula: ('SUM(A' + (sheetInfo.rowSum + 1) + ':A' + (row - 1) + ')'),
-                bold: true,
-                horizontalAlignment: 'center'
-            },
-            {
-                range: ['B' + sheetInfo.rowSum],
-                bold: true
-            },
-            {
-                range: ['E' + sheetInfo.rowSum],
-                formula: ('SUM(E' + (sheetInfo.rowSum + 1) + ':E' + (row - 1) + ')'),
-                bold: true,
-                numberFormat: '$#,###.00'
-            },
-            {
-                range: ['G' + sheetInfo.rowSum],
-                formula: ('SUM(G' + (sheetInfo.rowSum + 1) + ':G' + (row - 1) + ')'),
-                bold: true,
-                numberFormat: '$#,###.00'
-            },
-            {
-                range: [(sheetInfo.rowSum + 1) + ':' + (row - 1)],
-                groupByRows: true
-            }
-        ]);
-    }
+        if (sheetInfo.rowSum) {
 
-    return ranges;
-}
-
-function getLaborSectionRanges(row, sheetInfo) {
-
-    var ranges = getDefaultSectionRanges(row, sheetInfo);
-
-    if (sheetInfo.isSummary) {
-
-        ranges = ranges.concat([
-            {
-                range: ['A' + row],
-                color: (sheetInfo.isSummary ? '' : COLOR_INPUT),
-                horizontalAlignment: 'center',
-                bold: false
-            },
-/*            {
-                range: ['A' + row],
-                formula: sheetInfo.summaryFormulas.qty
-            },
-            {
-                range: ['D' + row],
-                formula: sheetInfo.summaryFormulas.cost
-            },
-            {
-                range: ['F' + row],
-                formula: sheetInfo.summaryFormulas.quote
-            }
-*/        ]);
-    }
-
-    return ranges;
-}
-
-function getExpenseSectionRanges(row, sheetInfo) {
-
-    var ranges = getDefaultSectionRanges(row, sheetInfo);
-
-    if (sheetInfo.isInsert) {
-
-        ranges = ranges.concat([
-            {
-                range: ['C' + row],
-                color: COLOR_INPUT
-            },
-            {
-                range: ['C' + row],
-                dataValidationRule: {
-                    list: {
-                        inCellDropDown: true,
-                        source: LISTS.expAccounts.join(',')
-                    }
+            ranges = ranges.concat([
+                {
+                    range: ['A' + sheetInfo.rowSum],
+                    formula: ('SUM(A' + (sheetInfo.rowSum + 1) + ':A' + (sheetInfo.row - 1) + ')'),
+                    bold: true,
+                    horizontalAlignment: 'center'
+                },
+                {
+                    range: ['B' + sheetInfo.rowSum],
+                    bold: true
+                },
+                {
+                    range: ['E' + sheetInfo.rowSum],
+                    formula: ('SUM(E' + (sheetInfo.rowSum + 1) + ':E' + (sheetInfo.row - 1) + ')'),
+                    bold: true,
+                    numberFormat: '$#,###.00'
+                },
+                {
+                    range: ['G' + sheetInfo.rowSum],
+                    formula: ('SUM(G' + (sheetInfo.rowSum + 1) + ':G' + (sheetInfo.row - 1) + ')'),
+                    bold: true,
+                    numberFormat: '$#,###.00'
+                },
+                {
+                    range: [(sheetInfo.rowSum + 1) + ':' + (sheetInfo.row - 1)],
+                    groupByRows: true
                 }
-            }
-        ]);
+            ]);
+        }
     }
 
     return ranges;
 }
 
-function getTotalRowRanges(row, sheetInfo) {
+function getTotalRowRanges(sheetInfo) {
 
     var E = [];
     var G = [];
@@ -980,11 +1128,11 @@ function getTotalRowRanges(row, sheetInfo) {
 
         ranges = [
             {
-                range: ['E' + row],
+                range: ['E' + sheetInfo.row],
                 formula: (E.length ? E.join('+') : '0')
             },
             {
-                range: ['G' + row],
+                range: ['G' + sheetInfo.row],
                 formula: (G.length ? G.join('+') : '0')
             },
         ];
@@ -993,11 +1141,11 @@ function getTotalRowRanges(row, sheetInfo) {
 
         ranges = [
             {
-                range: ['E' + row],
+                range: ['E' + sheetInfo.row],
                 formula: (E.length ? E.join('+') : '0')
             },
             {
-                range: ['G' + row],
+                range: ['G' + sheetInfo.row],
                 formula: (G.length ? G.join('+') : '0')
             }
         ];
