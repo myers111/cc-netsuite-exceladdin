@@ -307,7 +307,7 @@ async function addSummary(data) {
 
     await Excel.run(async (context) => {
 
-        var sheet = await excel.getSheet(context, "Summary");
+        var sheet = await excel.getEmptySheet(context, "Summary");
 
         await excel.setSheet(context, sheet, {
             values: values,
@@ -368,12 +368,7 @@ async function addBom(data) {
     // Ranges
 
     var ranges = sheetInfo.ranges;
-/*
-    // Set summaryFormulas
 
-    summaryFormulas.cost[data.bom.name] = "E" + dataArray.length;
-    summaryFormulas.quote[data.bom.name] = "G" + dataArray.length;
-*/
     ranges = ranges.concat([
         {
             range: ['A' + values.length + ':G' + values.length,'A' + sheetInfo.itemRowFirst,'A' + sheetInfo.laborRowFirst,'A' + sheetInfo.expenseRowFirst],
@@ -397,7 +392,7 @@ async function addBom(data) {
 
     await Excel.run(async (context) => {
 
-        var sheet = await excel.getSheet(context, data.bom.name);
+        var sheet = await excel.getEmptySheet(context, data.bom.name);
 
         WORKSHEET[sheet.id.toString()] = {bomId: data.bom.id};
 
@@ -412,14 +407,94 @@ async function addBom(data) {
         await context.sync();
     });
 
-    await addBomToSummary(data);
+    await addBomToSummary(laborValues, {
+        bomName: data.bom.name,
+        rowLabor: (2 + itemValues.length + 1),
+        rowTotal: values.length
+    });
 }
 
-async function addBomToSummary(data) {
+async function addBomToSummary(laborValues, params) {
 
     await Excel.run(async (context) => {
 
+        var laborItems = [];
+
+        for (var i = 0; i < laborValues.length; i++) {
+
+            var laborValue = laborValues[i];
+
+            if (laborValue[15] > 0) { // Labor quantity > 0
+
+                laborItems.push({
+                    itemId: laborValue[15],
+                    sgId: laborValue[16],
+                    row: params.rowLabor + i
+                });
+            }
+        }
+
         var sheet = await excel.getSheet(context, 'Summary');
+
+        /* Read all the values in formulas on this sheet at once.
+         * We can read through an array in JavaScript much faster than having to sync constantly.
+        */
+
+        var range = sheet.getUsedRange();
+
+        range.load("values");
+
+        await context.sync();
+
+        range.load("formulas");
+
+        await context.sync();
+
+        var ranges = [];
+
+        var section = LABEL_LABOR; // Starts at row 11 (10 for 0 based)
+
+        for (var i = 10; i < range.values.length - 1; i++) { // Start at first labor value and end at last item
+
+            var values = range.values[i];
+            var formulas = range.formulas[i];
+
+            if (section == LABEL_LABOR) {
+
+                if (values[0] == LABEL_ITEMS) {
+                    
+                    section = LABEL_ITEMS;
+                }
+                else if (values[1] != '') {
+                    
+                    const laborItem = laborItems.find((li) => li.itemId === values[8] && li.sgId === values[9]);
+
+                    ranges = ranges.concat([
+                        {
+                            range: ['A' + (i + 1)],
+                            formula: formulas[0].substring(1) + "+'" + params.bomName + "'!A" + laborItem.row
+                        },
+                        {
+                            range: ['F' + (i + 1)],
+                            formula: formulas[5].substring(1) + "+'" + params.bomName + "'!F" + laborItem.row
+                        }
+                    ]);
+                }
+            }
+            else { // LABEL_ITEMS
+                    
+                ranges = ranges.concat([
+                    {
+                        range: ['D' + (i + 1)],
+                        formula: "'" + params.bomName + "'!E" + params.rowTotal
+                    },
+                    {
+                        range: ['F' + (i + 1)],
+                        formula: "'" + params.bomName + "'!G" + params.rowTotal
+                    },
+                ]);
+            }
+        }
 
         await excel.setSheet(context, sheet, {
             ranges: ranges
@@ -537,11 +612,7 @@ function getLaborValues(data) {
                 0
             ];
 
-            if (data.isSummary) {
-
-                line = line.concat(['','','']); // Add spaces for hidden columns
-            }
-            else {
+            if (!data.isSummary) {
 
                 line = line.concat([
                     (labor.markUp > 0 ? labor.markUp : ''),
@@ -550,12 +621,13 @@ function getLaborValues(data) {
                     '',
                     '',
                     '',
-                    '',         // Add space for group control
-                    labor.key,  // Add key to hidden column
-                    labor.id,   // Add item ID to hidden column
-                    labor.sgId// Add group ID to hidden column
+                    '' // Add space for group control
                 ]);
             }
+
+            line.push(data.isSummary ? '' : labor.key); // Add key to hidden column
+            line.push(labor.id); // Add item ID for hidden column
+            line.push(labor.sgId); // Add group ID to hidden column
 
             values.push(line);
         }

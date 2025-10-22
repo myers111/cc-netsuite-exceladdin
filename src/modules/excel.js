@@ -1,6 +1,6 @@
 module.exports = {
 
-    getSheet: async function (context, name = null) {
+    getSheet: async function (context, name = null, empty = false) {
     
         var sheet = null;
 
@@ -35,19 +35,23 @@ module.exports = {
             }
             else {
 
-                await clear(context, name);
+                if (empty) await clear(context, name);
             }
         }
         else {
 
             sheet = context.workbook.worksheets.getActiveWorksheet();
 
-            await clear(context);
+            if (empty) await clear(context);
         }
 
         if (name == 'Summary') sheet.position = 0;
 
         return sheet;
+    },
+    getEmptySheet: async function (context, name = null, empty = false) {
+    
+        return await this.getSheet(context, name, true);
     },
     setSheet: async function (context, sheet, options) {
 
