@@ -409,7 +409,7 @@ async function addBom(data) {
 
     await addBomToSummary(laborValues, {
         bomName: data.bom.name,
-        rowLabor: (2 + itemValues.length + 1),
+        rowLabor: (3 + itemValues.length + 1),
         rowTotal: values.length
     });
 }
@@ -424,7 +424,7 @@ async function addBomToSummary(laborValues, params) {
 
             var laborValue = laborValues[i];
 
-            if (laborValue[15] > 0) { // Labor quantity > 0
+            if (laborValue[1] == '') { // Labor item
 
                 laborItems.push({
                     itemId: laborValue[15],
@@ -442,11 +442,7 @@ async function addBomToSummary(laborValues, params) {
 
         var range = sheet.getUsedRange();
 
-        range.load("values");
-
-        await context.sync();
-
-        range.load("formulas");
+        range.load("formulas"); // This gets the values as well when there isn't a formula
 
         await context.sync();
 
@@ -454,31 +450,33 @@ async function addBomToSummary(laborValues, params) {
 
         var section = LABEL_LABOR; // Starts at row 11 (10 for 0 based)
 
-        for (var i = 10; i < range.values.length - 1; i++) { // Start at first labor value and end at last item
+        for (var i = 10; i < range.formulas.length - 1; i++) { // Start at first labor value and end at last item
 
-            var values = range.values[i];
             var formulas = range.formulas[i];
 
             if (section == LABEL_LABOR) {
 
-                if (values[0] == LABEL_ITEMS) {
+                if (formulas[0] == LABEL_ITEMS) {
                     
                     section = LABEL_ITEMS;
                 }
-                else if (values[1] != '') {
-                    
-                    const laborItem = laborItems.find((li) => li.itemId === values[8] && li.sgId === values[9]);
+                else if (formulas[1] == '') { // Labor item
 
-                    ranges = ranges.concat([
-                        {
-                            range: ['A' + (i + 1)],
-                            formula: formulas[0].substring(1) + "+'" + params.bomName + "'!A" + laborItem.row
-                        },
-                        {
-                            range: ['F' + (i + 1)],
-                            formula: formulas[5].substring(1) + "+'" + params.bomName + "'!F" + laborItem.row
-                        }
-                    ]);
+                    const laborItem = laborItems.find((li) => li.itemId === formulas[8] && li.sgId === formulas[9]);
+
+                    if (laborItem) {
+
+                        ranges = ranges.concat([
+                            {
+                                range: ['A' + (i + 1)],
+                                formula: (Number.isInteger(formulas[0]) ? '' : formulas[0].substring(1) + "+") + "'" + params.bomName + "'!A" + laborItem.row
+                            },
+                            {
+                                range: ['F' + (i + 1)],
+                                formula: (Number.isInteger(formulas[5]) ? '' : formulas[5].substring(1) + "+") + "'" + params.bomName + "'!F" + laborItem.row
+                            }
+                        ]);
+                    }
                 }
             }
             else { // LABEL_ITEMS
