@@ -100,7 +100,7 @@ module.exports = {
 
                     if (rangeOptions.color) {
                     
-                        if (rangeOptions.color == 'white')
+                        if (rangeOptions.color == '')
                             range.format.fill.clear();
                         else
                             range.format.fill.color = rangeOptions.color;
