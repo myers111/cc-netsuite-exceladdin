@@ -245,7 +245,7 @@ async function addSummary(data) {
 
     for (var i = 1; i <= values.length; i++) {
 
-        ranges = ranges.concat(getRanges(i, sheetInfo, false));
+        ranges = ranges.concat(getRanges(i + 1, sheetInfo, false));
     }
 
     ranges = ranges.concat([
@@ -369,14 +369,13 @@ async function addBom(data) {
     // Sheet Info
 
     var sheetInfo = getSheetInfo(values);
-
     // Ranges
 
     var ranges = [];
 
     for (var i = 1; i <= values.length; i++) {
 
-        ranges = ranges.concat(getRanges(i, sheetInfo, false));
+        ranges = ranges.concat(getRanges(i + 1, sheetInfo, false));
     }
 
     ranges = ranges.concat([
@@ -766,42 +765,44 @@ function getSheetInfo(values) {
         }
     };
 
+    var groupRow = '';
+
     for (var i = 0; i < values.length; i++) {
+        
+        var row = i + 1;
+
+        if ((info.isSummary && row <= 8) || (info.isBom && row == 1)) continue; // Skip the headings
 
         switch (values[i][0]) {
             case 'Items':
-                info.item.first = i + 1;
-                if (info.isSummary) info.labor.last = i;
+                info.item.first = row + 1;
+                if (info.isSummary) info.labor.last = row - 1;
                 break;
             case 'Labor':
-                info.labor.first = i + 1;
-                if (info.isBom) info.item.last = i;
+                info.labor.first = row + 1;
+                if (info.isBom) info.item.last = row - 1;
                 break;
             case 'Expenses':
-                info.expense.first = i + 1;      
-                info.labor.last = i;
+                info.expense.first = row + 1;
+                info.labor.last = row - 1;
                 break;
             case 'Total':
-                info[info.isSummary ? 'item' : 'expense'].last = i;
+                info[info.isSummary ? 'item' : 'expense'].last = row - 1;
                 break;
             default:
                 { // Group elements are named by the actual Excel row number
-                    var row = i + 1;
 
-                    if (row == info.labor.first) {
-
-                        sheetInfo.labor.group[row.toString()] = { first: row + 1, last: 0};
-                    }
-                    else if (row == info.labor.last) {
-
-                        sheetInfo.labor.group[sheetInfo.labor.group.length - 1].last = row;
-                    }
-                    else if (row > info.labor.first && row < info.labor.last) {
+                    if (info.labor.first > 0 && info.labor.last == 0) {
 
                         if (values[i][1].length) { // This is a labor group
 
-                            sheetInfo.labor.group[sheetInfo.labor.group.length - 1].last = row - 1;
-                            sheetInfo.labor.group[row.toString()] = { first: row + 1, last: 0};
+                            groupRow = row.toString();
+
+                            info.labor.group[groupRow] = {first: row + 1, last: row + 1};
+                        }
+                        else {
+
+                            info.labor.group[groupRow].last = row;
                         }
                     }
                 }
@@ -816,41 +817,24 @@ function getRanges(row, sheetInfo, isInsert) {
 
     var ranges = [];
 
-    if (!isInsert) {
-
-        if (row == sheetInfo.item.first - 1) {
-            
-            if (sheetInfo.isSummary) ranges = ranges.concat(getLaborSectionGroupRanges(row, sheetInfo));
-        }
-        else if (row == sheetInfo.expense.first - 1) {
-            
-            ranges = ranges.concat(getLaborSectionGroupRanges(row, sheetInfo));
-        }
-    }
-
     if (row >= sheetInfo.item.first && row <= sheetInfo.item.last) {
         
         ranges = ranges.concat(getItemSectionRanges(row, sheetInfo));
     }
     else if (row >= sheetInfo.labor.first && row <= sheetInfo.labor.last) {
 
-        if (!isInsert) {
+        if (sheetInfo.labor.group[row.toString()]) { // This is a labor group
 
-            if (values[i][1].length) { // This is a labor group
+            ranges = ranges.concat(getLaborSectionGroupRanges(row, sheetInfo));
+        }
+        else {
 
-                ranges = ranges.concat(getLaborSectionGroupRanges(row, sheetInfo));
-
-                sheetInfo['rowSum'] = row;
-            }
-            else {
-
-                ranges = ranges.concat(getLaborSectionRanges(row, sheetInfo));
-            }
+            ranges = ranges.concat(getLaborSectionRanges(row, sheetInfo));
         }
     }
     else if (row >= sheetInfo.expense.first && row <= sheetInfo.expense.last) {
         
-        if (!rows || (rows && i + 1 >= rows.rowFirst && i + 1 <= rows.rowLast)) ranges = ranges.concat(getExpenseSectionRanges(i + 1, sheetInfo));
+        ranges = ranges.concat(getExpenseSectionRanges(row, sheetInfo));
     }
 
     return  ranges;
@@ -908,11 +892,22 @@ function getDefaultSectionRanges(row, sheetInfo) {
         ]);
     }
 
-    // Input range formats7
+    // Input range formats
 
     var inputRanges = [];
 
-    if (sheetInfo.isItem) inputRanges.push('A' + row);
+    if (row >= sheetInfo.item.first && row <= sheetInfo.item.last) {
+        
+        inputRanges.push('A' + row);
+    }
+    else if (row >= sheetInfo.labor.first && row <= sheetInfo.labor.last && sheetInfo.isBom && !sheetInfo.labor.group[row.toString()]) {
+
+        inputRanges.push('A' + row);
+    }
+    else if (row >= sheetInfo.expense.first && row <= sheetInfo.expense.last) {
+        
+        inputRanges.push('A' + row);
+    }
 
     var ranges = ranges.concat([
         {
@@ -936,7 +931,7 @@ function getItemSectionRanges(row, sheetInfo) {
     ]);
 
     if (sheetInfo.isSummary) {
-
+/*
         if (sheetInfo.bomName) {
 
             ranges = ranges.concat([
@@ -959,7 +954,7 @@ function getItemSectionRanges(row, sheetInfo) {
                 }
             ]);
         }
-    }
+*/    }
     else {
 
         if (sheetInfo.isInsert) {
@@ -992,33 +987,35 @@ function getLaborSectionGroupRanges(row, sheetInfo) {
 
     var ranges = [];
 
-    if (sheetInfo.rowSum) {
+    var group = sheetInfo.labor.group[row.toString()];
+
+    if (group) {
 
         ranges = ranges.concat([
             {
-                range: ['A' + sheetInfo.rowSum],
-                formula: ('SUM(A' + (sheetInfo.rowSum + 1) + ':A' + (row - 1) + ')'),
+                range: ['A' + row],
+                formula: ('SUM(A' + group.first + ':A' + group.last + ')'),
                 bold: true,
                 horizontalAlignment: 'center'
             },
             {
-                range: ['B' + sheetInfo.rowSum],
+                range: ['B' + row],
                 bold: true
             },
             {
-                range: ['E' + sheetInfo.rowSum],
-                formula: ('SUM(E' + (sheetInfo.rowSum + 1) + ':E' + (row - 1) + ')'),
+                range: ['E' + row],
+                formula: ('SUM(E' + group.first + ':E' + group.last + ')'),
                 bold: true,
                 numberFormat: '$#,###.00'
             },
             {
-                range: ['G' + sheetInfo.rowSum],
-                formula: ('SUM(G' + (sheetInfo.rowSum + 1) + ':G' + (row - 1) + ')'),
+                range: ['G' + row],
+                formula: ('SUM(G' + group.first + ':G' + group.last + ')'),
                 bold: true,
                 numberFormat: '$#,###.00'
             },
             {
-                range: [(sheetInfo.rowSum + 1) + ':' + (row - 1)],
+                range: [group.first + ':' + group.last],
                 groupByRows: true
             }
         ]);
