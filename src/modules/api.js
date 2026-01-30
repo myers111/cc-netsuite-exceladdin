@@ -55,8 +55,8 @@ async function doFetch(path, options) {
 
     try {
 
-        //const response = await fetch('https://cc-netsuite.azurewebsites.net/api/quoting-excel/' + path, options);
-        const response = await fetch('http://localhost:8080/api/quoting-excel/' + path, options);
+        const response = await fetch('https://cc-netsuite-node.azurewebsites.net/api/quoting-excel/' + path, options);
+        //const response = await fetch('http://localhost:8080/api/quoting-excel/' + path, options);
 
         const contentType = response.headers.get("content-type");
 
