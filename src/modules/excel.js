@@ -157,57 +157,7 @@ async function clear(context, sheetName = null) {
 
     await context.sync();
 }
-/*
-async function getSheet(context, sheetName = null) {
-    
-    var sheet = null;
 
-    if (sheetName) {
-
-        sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
-
-        sheet.load("isNullObject");
-
-        await context.sync();
-
-        if (sheet.isNullObject) {
-
-            sheet = context.workbook.worksheets.getActiveWorksheet();
-
-            var range = sheet.getUsedRangeOrNullObject(true);
-
-            range.load("isNullObject");
-
-            await context.sync();
-
-            if (range.isNullObject) {
-
-                sheet.name = sheetName;
-            }
-            else {
-
-                sheet = context.workbook.worksheets.add(sheetName);
-            }
-
-            await context.sync();
-        }
-        else {
-
-            await clear(context, sheetName);
-        }
-    }
-    else {
-
-        sheet = context.workbook.worksheets.getActiveWorksheet();
-
-        await clear(context);
-    }
-
-    if (sheetName == 'Summary') sheet.position = 0;
-
-    return sheet;
-}
-*/
 function getRangeString(options) {
 
     var firstColumn = (options.firstColumn ? options.firstColumn : 'A');
@@ -218,7 +168,7 @@ function getRangeString(options) {
 
 function getRangeProperties(rangeString) {
 
-    // Using this method is much faster then syncing to get the rowIndex, rowCount &columnCount properties
+    // Using this method is much faster then syncing to get the rowIndex, rowCount & columnCount properties
 
     var ranges = rangeString.split(':');
 
