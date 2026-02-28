@@ -72,7 +72,7 @@ module.exports = {
                 var rangeOptions = options.ranges[i];
 
                 for (var j = 0; j < rangeOptions.range.length; j++) {
-    
+
                     var range = sheet.getRange(rangeOptions.range[j]);
 
                     var rangeProperties = getRangeProperties(rangeOptions.range[j]);
@@ -95,6 +95,8 @@ module.exports = {
                         if (numberFormat.length) numberFormats.push(numberFormat);
                     }
 
+                    if (rangeOptions.values) range.values = rangeOptions.values;
+
                     if (formulas.length) range.formulas = formulas;
                     if (numberFormats.length) range.numberFormat = numberFormats;
 
@@ -106,7 +108,6 @@ module.exports = {
                             range.format.fill.color = rangeOptions.color;
                     }
 
-                    if (rangeOptions.values) range.values = rangeOptions.values;
                     if (rangeOptions.horizontalAlignment) range.format.horizontalAlignment = rangeOptions.horizontalAlignment;
                     if (rangeOptions.bold != null) range.format.font.bold = rangeOptions.bold;
                     if (rangeOptions.groupByRows) {range.group(Excel.GroupOption.byRows); range.hideGroupDetails();}

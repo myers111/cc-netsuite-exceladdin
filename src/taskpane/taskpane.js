@@ -22,8 +22,6 @@ var WORKSHEET = {};
 var LISTS = null;
 var BOM_NAME = '';
 
-var summaryFormulas = null;
-
 Office.onReady((info) => {
 
     if (info.host === Office.HostType.Excel) {
@@ -421,45 +419,137 @@ async function addBom(data) {
         await sheet.onChanged.add(onWorksheetChange);
 
         await context.sync();
+
     });
 
-    if (data.bom.id == 0) { // This is a new BOM so add the line to the Summary
-
-        await addBomItemToSummary({
-            name: data.bom.name
-        });
-    }
-
+    await addBomItemToSummary({
+        id: data.bom.id,
+        name: data.bom.name,
+        totalRow: values.length,
+        laborRow: (3 + itemValues.length + 1),
+        laborValues: laborValues
+    });
+/*
     await addBomLinksToSummary(laborValues, {
         bomName: data.bom.name,
         rowLabor: (3 + itemValues.length + 1),
+        rowItem: newRow,
         rowTotal: values.length
     });
-}
+*/}
 
-async function addBomItemToSummary(params) {tfvb54
+async function addBomItemToSummary(params) {
 
     await Excel.run(async (context) => {
 
         var sheet = await excel.getSheet(context, 'Summary');
 
-        var range = sheet.getRange('A:A').find("Total", { completeMatch: true }); 
+        // Item
+
+        var range = null;
+
+        if (params.id == 0) { // This is a new BOM
+
+            range = sheet.getRange('A:A').find("Total", { completeMatch: true, searchDirection: Excel.SearchDirection.forward }); 
+        }
+        else {
+
+            range = sheet.getRange('J:J').find(params.id.toString(), { completeMatch: true, searchDirection: Excel.SearchDirection.forward });
+        }
 
         range.load("rowIndex"); // Zero based
 
         await context.sync();
 
-        // Insert a row
-
-        BOM_NAME = params.name;
-
         var row = range.rowIndex + 1;
 
-        sheet.getRange(row + ":" + row).insert(Excel.InsertShiftDirection.down);
+        if (params.id == 0) { // This is a new BOM so insert a row
+
+            BOM_NAME = params.name;
+ 
+            sheet.getRange(row + ":" + row).insert(Excel.InsertShiftDirection.down); // OnWorksheetChange will handle the item
+    
+            await context.sync();
+        }
+
+        var ranges = [
+            {
+                range: ['C' + row],
+                formula: 'TEXTAFTER(CELL("filename",\'' + params.name + '\'!A1),"]")'
+            },
+            {
+                range: ['D' + row],
+                formula: "'" + params.name + "'!E" + params.totalRow
+            },
+            {
+                range: ['F' + row],
+                formula: "'" + params.name + "'!G" + params.totalRow
+            }
+        ];
+
+        // Labor
+
+        var laborItems = [];
+
+        for (var i = 0; i < params.laborValues.length; i++) {
+
+            var laborValue = params.laborValues[i];
+
+            if (laborValue[1] == '') { // Labor item
+
+                laborItems.push({
+                    itemId: laborValue[15],
+                    sgId: laborValue[16], // Service Group
+                    row: params.laborRow + i
+                });
+            }
+        }
+
+        /* Read all the values in formulas on this sheet at once.
+         * We can read through an array in JavaScript much faster than having to sync constantly.
+        */
+
+        var range = sheet.getUsedRange();
+
+        range.load("formulas"); // This gets the values as well when there isn't a formula
 
         await context.sync();
+
+        const laborIndex = range.formulas.indexOf(LABEL_LABOR);
+        const itemIndex = range.formulas.indexOf(LABEL_ITEMS);
+
+        // Labor
+
+        for (var i = laborIndex + 1; i < itemIndex; i++) {
+
+            var formulas = range.formulas[i];
+
+            if (formulas[1] == '') { // Labor item
+
+                const laborItem = laborItems.find((li) => li.itemId === formulas[8] && li.sgId === formulas[9]);
+
+                if (laborItem) {
+
+                    ranges = ranges.concat([
+                        {
+                            range: ['A' + (i + 1)],
+                            formula: (Number.isInteger(formulas[0]) ? '' : formulas[0].substring(1) + "+") + "'" + params.name + "'!A" + laborItem.row
+                        },
+                        {
+                            range: ['F' + (i + 1)],
+                            formula: (Number.isInteger(formulas[5]) ? '' : formulas[5].substring(1) + "+") + "'" + params.name + "'!F" + laborItem.row
+                        }
+                    ]);
+                }
+            }
+        }
+
+        await excel.setSheet(context, sheet, {
+            ranges: ranges
+        });
     });
 }
+/*
 async function addBomLinksToSummary(laborValues, params) {
 
     await Excel.run(async (context) => {
@@ -485,7 +575,99 @@ async function addBomLinksToSummary(laborValues, params) {
         /* Read all the values in formulas on this sheet at once.
          * We can read through an array in JavaScript much faster than having to sync constantly.
         */
+/*
+        var range = sheet.getUsedRange();
 
+        range.load("formulas"); // This gets the values as well when there isn't a formula
+
+        await context.sync();
+
+        var ranges = [];
+
+        const laborIndex = range.formulas.indexOf(LABEL_LABOR);
+        const itemIndex = range.formulas.indexOf(LABEL_ITEMS);
+        const totalIndex = range.formulas.indexOf(LABEL_TOTAL);
+
+        // Labor
+
+        for (var i = laborIndex + 1; i < itemIndex; i++) {
+
+            var formulas = range.formulas[i];
+
+            if (formulas[1] == '') { // Labor item
+
+                const laborItem = laborItems.find((li) => li.itemId === formulas[8] && li.sgId === formulas[9]);
+
+                if (laborItem) {
+
+                    ranges = ranges.concat([
+                        {
+                            range: ['A' + (i + 1)],
+                            formula: (Number.isInteger(formulas[0]) ? '' : formulas[0].substring(1) + "+") + "'" + params.bomName + "'!A" + laborItem.row
+                        },
+                        {
+                            range: ['F' + (i + 1)],
+                            formula: (Number.isInteger(formulas[5]) ? '' : formulas[5].substring(1) + "+") + "'" + params.bomName + "'!F" + laborItem.row
+                        }
+                    ]);
+                }
+            }
+        }
+
+        // Item
+
+        for (var i = laborIndex + 1; i < itemIndex; i++) {
+
+            var formulas = range.formulas[i];
+
+        ranges = ranges.concat([
+            {
+                range: ['C' + params.rowItem],
+                formula: 'TEXTAFTER(CELL("filename",\'' + params.bomName + '\'!A1),"]")'
+            },
+            {
+                range: ['D' + params.rowItem],
+                formula: "'" + params.bomName + "'!E" + params.rowTotal
+            },
+            {
+                range: ['F' + params.rowItem],
+                formula: "'" + params.bomName + "'!G" + params.rowTotal
+            }
+        ]);
+        }
+
+        await excel.setSheet(context, sheet, {
+            ranges: ranges
+        });
+    });
+}
+
+async function addBomLinksToSummary(laborValues, params) {
+
+    await Excel.run(async (context) => {
+
+        var laborItems = [];
+
+        for (var i = 0; i < laborValues.length; i++) {
+
+            var laborValue = laborValues[i];
+
+            if (laborValue[1] == '') { // Labor item
+
+                laborItems.push({
+                    itemId: laborValue[15],
+                    sgId: laborValue[16], // Service Group
+                    row: params.rowLabor + i
+                });
+            }
+        }
+
+        var sheet = await excel.getSheet(context, 'Summary');
+
+        /* Read all the values in formulas on this sheet at once.
+         * We can read through an array in JavaScript much faster than having to sync constantly.
+        */
+/*
         var range = sheet.getUsedRange();
 
         range.load("formulas"); // This gets the values as well when there isn't a formula
@@ -529,13 +711,17 @@ async function addBomLinksToSummary(laborValues, params) {
 
                 ranges = ranges.concat([
                     {
+                        range: ['C' + (i + 1)],
+                        formula: 'TEXTAFTER(CELL("filename",\'' + params.bomName + '\'!A1),"]")'
+                    },
+                    {
                         range: ['D' + (i + 1)],
                         formula: "'" + params.bomName + "'!E" + params.rowTotal
                     },
                     {
                         range: ['F' + (i + 1)],
                         formula: "'" + params.bomName + "'!G" + params.rowTotal
-                    },
+                    }
                 ]);
             }
         }
@@ -545,7 +731,7 @@ async function addBomLinksToSummary(laborValues, params) {
         });
     });
 }
-
+*/
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function getItemValues(data) {
@@ -743,31 +929,49 @@ async function onWorksheetChange(eventArgs) {
 
                 if (i >= sheetInfo.item.first && i <= sheetInfo.item.last) {
 
+                    var isSummaryBom = (sheetInfo.isSummary && BOM_NAME);
+
+                    ranges = ranges.concat([{
+                        range: ['A' + i + ':C' + i],
+                        values: [[1,(isSummaryBom ? 'Milestone Payment' : ''),(isSummaryBom ? BOM_NAME : '')]]
+                    }]);
+
                     if (sheetInfo.isSummary) {
 
                         if (BOM_NAME) {
 
                             ranges = ranges.concat([{
-                                range: ['A' + i + ':J' + i],
-                                values: [[1,'Milestone Payment',BOM_NAME,0,0,0,0,'',MILESTONE_PAYMENT,0]]
+                                range: ['I' + i + ':J' + i],
+                                values: [[MILESTONE_PAYMENT,0]]
                             }]);
+
+                            ranges = ranges.concat(getSummaryRowRanges(i, {
+                                name: BOM_NAME,
+                                totalRow: 0
+                            }));
 
                             BOM_NAME = '';
                         }
                         else {
 
                             ranges = ranges.concat([{
-                                range: ['A' + i + ':G' + i],
-                                values: [[1,'','',0,0,0,0]]
+                                range: ['D' + i, 'F' + i],
+                                values: [[0]]
                             }]);
                         }
                     }
                     else {
 
-                        ranges = ranges.concat([{
-                            range: ['A' + i + ':J' + i],
-                            values: [[1,'','',0,0,0,0,'','No','Ea']]
-                        }]);
+                        ranges = ranges.concat([
+                            {
+                                range: ['D' + i, 'F' + i],
+                                values: [[0]]
+                            },
+                            {
+                                range: ['I' + i + ':J' + i],
+                                values: [['No','Ea']]
+                            }   
+                        ]);
                     }
                 }
                 else if (i >= sheetInfo.expense.first && i <= sheetInfo.expense.last) {
@@ -780,7 +984,7 @@ async function onWorksheetChange(eventArgs) {
             }
 
             ranges = ranges.concat(getTotalRowRanges(range.values.length, sheetInfo));
-console.log('00000000 - ' + JSON.stringify(ranges));
+
             await excel.setSheet(context, sheet, {
                 ranges: ranges
             });
@@ -975,32 +1179,7 @@ function getItemSectionRanges(row, sheetInfo, isInsert) {
         }
     ]);
 
-    if (sheetInfo.isSummary) {
-/*
-        if (sheetInfo.bomName) {
-
-            ranges = ranges.concat([
-                {
-                    range: ['C' + row],
-                    formula: 'TEXTAFTER(CELL("filename",\'' + sheetInfo.bomName + '\'!A1),"]")'
-
-                },
-                {
-                    range: ['D' + row],
-                    formula: "'" + sheetInfo.bomName + "'!" + summaryFormulas.cost[sheetInfo.bomName]
-                },
-                {
-                    range: ['F' + row],
-                    formula: "'" + sheetInfo.bomName + "'!" + summaryFormulas.quote[sheetInfo.bomName]
-                },
-                {
-                    range: ['C' + row + ':D' + row],
-                    color: ''
-                }
-            ]);
-        }
-*/    }
-    else {
+    if (sheetInfo.isBom) {
 
         if (isInsert) {
 
@@ -1106,6 +1285,24 @@ function getExpenseSectionRanges(row, sheetInfo, isInsert) {
     }
 
     return ranges;
+}
+
+function getSummaryRowRanges(row, params) {
+
+    return [
+        {
+            range: ['C' + row],
+            formula: 'TEXTAFTER(CELL("filename",\'' + params.name + '\'!A1),"]")'
+        },
+        {
+            range: ['D' + row],
+            formula: "'" + params.name + "'!E" + params.totalRow
+        },
+        {
+            range: ['F' + row],
+            formula: "'" + params.name + "'!G" + params.totalRow
+        }
+    ];
 }
 
 function getTotalRowRanges(row, sheetInfo) {
