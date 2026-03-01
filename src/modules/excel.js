@@ -53,6 +53,18 @@ module.exports = {
     
         return await this.getSheet(context, name, true);
     },
+   enableEvents: async function (context, enable) {
+
+        const application = context.workbook.application;
+
+        application.load('enableEvents');
+
+        await context.sync();
+
+        application.enableEvents = enable;
+
+        await context.sync();
+    },
     setSheet: async function (context, sheet, options) {
 
         if (options.values) {
