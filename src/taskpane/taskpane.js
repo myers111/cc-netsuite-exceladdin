@@ -528,8 +528,8 @@ async function addBomItemToSummary(params) {
 
         await context.sync();
 
-        const laborIndex = range.formulas.indexOf(LABEL_LABOR);
-        const itemIndex = range.formulas.indexOf(LABEL_ITEMS);
+        const laborIndex = range.formulas.findIndex(element => element[0] == LABEL_LABOR && element[6] == '');
+        const itemIndex = range.formulas.findIndex(element => element[0] == LABEL_ITEMS && element[6] == '');
 
         // Labor
 
@@ -732,7 +732,7 @@ function getExpenseValues(data) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async function onWorksheetChange(eventArgs) {
-console.log('onWorksheetChange');
+
     await Excel.run(async (context) => {
 
         if (eventArgs.changeType === Excel.DataChangeType.rowInserted) {
