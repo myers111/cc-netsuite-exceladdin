@@ -426,8 +426,7 @@ async function addBom(data) {
         name: data.bom.name,
         totalRow: values.length,
         laborRow: (3 + itemValues.length + 1),
-        laborValues: laborValues,
-        sheetInfo: sheetInfo
+        laborValues: laborValues
     });
 }
 
@@ -462,7 +461,17 @@ async function addBomItemToSummary(params) {
 
             sheet.getRange(row + ":" + row).insert(Excel.InsertShiftDirection.down); // OnWorksheetChange will have been disabled
 
-            ranges = ranges.concat(getRanges(row, params.sheetInfo, true));
+            await context.sync();
+
+            var range = sheet.getUsedRange();
+
+            range.load("values");
+
+            await context.sync();
+
+            var sheetInfo = getSheetInfo(range.values);
+
+            ranges = ranges.concat(getRanges(row, sheetInfo, true));
 
             ranges = ranges.concat([
                 {
@@ -722,7 +731,7 @@ function getExpenseValues(data) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async function onWorksheetChange(eventArgs) {return;
+async function onWorksheetChange(eventArgs) {
 console.log('onWorksheetChange');
     await Excel.run(async (context) => {
 
@@ -1124,8 +1133,8 @@ async function onAddBom() {
 
     await Excel.run(async (context) => {
 
-        excel.enableEvents(context, false);
-
+        context.runtime.enableEvents = false;
+        
         context.workbook.worksheets.getItem('Summary').activate();
 
         await context.sync();
@@ -1142,7 +1151,9 @@ async function onAddBom() {
             expAccounts: LISTS.expAccounts
         });
 
-        excel.enableEvents(context, true);
+        context.runtime.enableEvents = true;
+
+        await context.sync();
     });
 }
 
