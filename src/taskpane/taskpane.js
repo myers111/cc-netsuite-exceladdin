@@ -384,7 +384,7 @@ async function addBom(data) {
 
     ranges = ranges.concat([
         {
-            range: ['A1:M1','A' + values.length + ':G' + values.length,'A' + (sheetInfo.item.first - 1),'A' + (sheetInfo.labor.first - 1),'A' + (sheetInfo.expense.first - 1)],
+            range: ['A1:M1','A' + values.length + ':G' + values.length,'A' + sheetInfo.item.label,'A' + sheetInfo.labor.label,'A' + sheetInfo.expense.label],
             bold: true
         },
         {
@@ -401,7 +401,7 @@ async function addBom(data) {
         }
     ]);
 
-    ranges = ranges.concat(getTotalRowRanges(values.length, sheetInfo));
+    //ranges = ranges.concat(getTotalRowRanges(values.length, sheetInfo));
 
     await Excel.run(async (context) => {
 
@@ -795,36 +795,29 @@ async function onWorksheetChange(eventArgs) {
 
 function getSheetInfo(values) {
 
-    // All first and last elements are the actual Excel row numbers
-
-    const isSummary = (values[0][0] == 'Quote');
-    const isBom = (values[0][0] == 'Quantity');
-
-    const itemRow = values.findIndex(element => element[0] == LABEL_ITEMS) + 1;
-    const laborRow = values.findIndex(element => element[0] == LABEL_LABOR) + 1;
-    const expenseRow = (isBom ? values.findIndex(element => element[0] == LABEL_EXPENSES) + 1 : 0);
-    const totalRow = values.findIndex(element => element[0] == LABEL_TOTAL) + 1;
-
-    const hasItems = ((isSummary ? totalRow : laborRow) - itemRow > 1);
-    const hasExpenses = (isBom && (totalRow - expenseRow > 1));
+    // Positions are actual Excel row numbers
 
     var info = {
-        isSummary: isSummary,
-        isBom: isBom,
-        item: {
-            first: ((isSummary ? totalRow : laborRow) - itemRow == 1 ? 0 : itemRow + 1),
-            last: (hasItems ? (isSummary ? totalRow : laborRow) - 1 : 0)
-        },
-        labor: {
-            first: laborRow + 1,
-            last: (isSummary ? itemRow : expenseRow) - 1,
+        isSummary: (values[0][0] == 'Quote'),
+        isBom: (values[0][0] == 'Quantity'),
+        item: { label: values.findIndex(element => element[0] == LABEL_ITEMS) + 1 },
+        labor: { 
+            label: values.findIndex(element => element[0] == LABEL_LABOR) + 1,
             group: {}
         },
-        expense: {
-            first: (isBom && hasExpenses ? expenseRow + 1 : 0),
-            last: (isBom && hasExpenses ? totalRow - 1 : 0)
-        }
+        expense: { label: values.findIndex(element => element[0] == LABEL_EXPENSES) + 1 }
     };
+
+    const totalRow = values.findIndex(element => element[0] == LABEL_TOTAL) + 1;
+    const hasItems = ((info.isSummary ? totalRow : info.labor.label) - info.item.label > 1);
+    const hasExpenses = (info.isBom && (totalRow - info.expense.label > 1));
+
+    info.item.first = ((info.isSummary ? totalRow : info.labor.label) - info.item.label == 1 ? 0 : info.item.label + 1);
+    info.item.last = (hasItems ? (info.isSummary ? totalRow : info.labor.label) - 1 : 0);
+    info.labor.first = info.labor.label + 1;
+    info.labor.last = (info.isSummary ? info.item.label : info.expense.label) - 1;
+    info.expense.first = (info.isBom && hasExpenses ? info.expense.label + 1 : 0);
+    info.expense.last = (info.isBom && hasExpenses ? totalRow - 1 : 0);
 
     var groupRow = '';
 
