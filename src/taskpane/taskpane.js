@@ -1197,7 +1197,7 @@ async function onSave() {
 
                     data.boms.push({id: bomId, name: sheet.name, items: [], expenses: []});
                 }
-
+console.log(sheet.name + ' - ' + JSON.stringify(data));
                 var section = '';
      
                 for (var i = 0; i < range.values.length; i++) {
@@ -1209,7 +1209,7 @@ async function onSave() {
                         case LABEL_ITEMS:
                         case LABEL_LABOR:
                         case LABEL_EXPENSES:
-                            section = values[0];
+                            section = (sheet.name == 'Summary' ? '' : values[0]);
                             continue;
                         case LABEL_TOTAL:
                             section = '';
@@ -1282,7 +1282,7 @@ async function onSave() {
                     }
                 }
             }
-
+console.log('2 - ' + JSON.stringify(data));
             var params = {
                 path: 'quote',
                 options: {data: data}
