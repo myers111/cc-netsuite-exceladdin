@@ -207,8 +207,8 @@ async function addSummary(data) {
         ['MU (Default)','','','','','',(data.defaultMU / 100),'','',''],
         ['GM','','','','','',0,'','',''],
         ['MU','','','','Cost','Quote',0,'','',''],
-        [LABEL_ITEMS,'','','',0,0,0,'','',''],
-        [LABEL_LABOR,'','','',0,0,0,'','',''],
+        ['Item Totals','','','',0,0,0,'','',''],
+        ['Labor Totals','','','',0,0,0,'','',''],
         ['','','','','','','','','',''],
         LABEL_HEADER.concat(['','','']),
         [LABEL_LABOR,'','','','','','','','',''],
@@ -528,12 +528,12 @@ async function addBomItemToSummary(params) {
 
         await context.sync();
 
-        const laborIndex = range.formulas.findIndex(element => element[0] == LABEL_LABOR && element[6] == '');
-        const itemIndex = range.formulas.findIndex(element => element[0] == LABEL_ITEMS && element[6] == '');
+        const laborRow = range.formulas.findIndex(element => element[0] == LABEL_LABOR);
+        const itemRow = range.formulas.findIndex(element => element[0] == LABEL_ITEMS);
 
         // Labor
 
-        for (var i = laborIndex + 1; i < itemIndex; i++) {
+        for (var i = laborRow + 1; i < itemRow; i++) {
 
             var formulas = range.formulas[i];
 
@@ -797,66 +797,48 @@ function getSheetInfo(values) {
 
     // All first and last elements are the actual Excel row numbers
 
+    const isSummary = (values[0][0] == 'Quote');
+    const isBom = (values[0][0] == 'Quantity');
+
+    const itemRow = values.findIndex(element => element[0] == LABEL_ITEMS) + 1;
+    const laborRow = values.findIndex(element => element[0] == LABEL_LABOR) + 1;
+    const expenseRow = (isBom ? values.findIndex(element => element[0] == LABEL_EXPENSES) + 1 : 0);
+    const totalRow = values.findIndex(element => element[0] == LABEL_TOTAL) + 1;
+
+    const hasItems = ((isSummary ? totalRow : laborRow) - itemRow > 1);
+    const hasExpenses = (isBom && (totalRow - expenseRow > 1));
+
     var info = {
-        isSummary: (values[0][0] == 'Quote'),
-        isBom: (values[0][0] == 'Quantity'),
+        isSummary: isSummary,
+        isBom: isBom,
         item: {
-            first: 0,
-            last: 0
+            first: ((isSummary ? totalRow : laborRow) - itemRow == 1 ? 0 : itemRow + 1),
+            last: (hasItems ? (isSummary ? totalRow : laborRow) - 1 : 0)
         },
         labor: {
-            first: 0,
-            last: 0,
+            first: laborRow + 1,
+            last: (isSummary ? itemRow : expenseRow) - 1,
             group: {}
         },
         expense: {
-            first: 0,
-            last: 0
+            first: (isBom && hasExpenses ? expenseRow + 1 : 0),
+            last: (isBom && hasExpenses ? totalRow - 1 : 0)
         }
     };
 
     var groupRow = '';
 
-    for (var i = 0; i < values.length; i++) {
-        
-        var row = i + 1;
+    for (var i = info.labor.first; i <= info.labor.last; i++) { // i = row number
 
-        if ((info.isSummary && row <= 8) || (info.isBom && row == 1)) continue; // Skip the headings
+        if (values[i - 1][1].length) { // This is a labor group
 
-        switch (values[i][0]) {
-            case 'Items':
-                info.item.first = row + 1;
-                if (info.isSummary) info.labor.last = row - 1;
-                break;
-            case 'Labor':
-                info.labor.first = row + 1;
-                if (info.isBom) info.item.last = row - 1;
-                break;
-            case 'Expenses':
-                info.expense.first = row + 1;
-                info.labor.last = row - 1;
-                break;
-            case 'Total':
-                info[info.isSummary ? 'item' : 'expense'].last = row - 1;
-                break;
-            default:
-                { // Group elements are named by the actual Excel row number
+            groupRow = i.toString();
 
-                    if (info.labor.first > 0 && info.labor.last == 0) {
+            info.labor.group[groupRow] = {first: i + 1, last: i + 1};
+        }
+        else {
 
-                        if (values[i][1].length) { // This is a labor group
-
-                            groupRow = row.toString();
-
-                            info.labor.group[groupRow] = {first: row + 1, last: row + 1};
-                        }
-                        else {
-
-                            info.labor.group[groupRow].last = row;
-                        }
-                    }
-                }
-                break;
+            info.labor.group[groupRow].last = i;
         }
     }
 
@@ -1234,7 +1216,7 @@ async function onSave() {
                         case LABEL_ITEMS:
                         case LABEL_LABOR:
                         case LABEL_EXPENSES:
-                            if ((sheet.name == 'Summary' && i >= 9) || sheet.name != 'Summary') section = values[0];
+                            section = values[0];
                             continue;
                         case LABEL_TOTAL:
                             section = '';
